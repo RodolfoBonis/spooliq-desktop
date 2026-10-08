@@ -22,6 +22,7 @@ class AdminPlansPage extends StatefulWidget {
 class _AdminPlansPageState extends State<AdminPlansPage> {
   final AdminRepository _repo = di<AdminRepository>();
   List<Plan>? _plans;
+  final Set<String> _selected = {};
   String? _error;
 
   @override
@@ -34,7 +35,12 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     setState(() => _error = null);
     try {
       final plans = await _repo.plans();
-      if (mounted) setState(() => _plans = plans);
+      if (mounted) {
+        setState(() {
+          _plans = plans;
+          _selected.retainWhere((id) => plans.any((p) => p.id == id));
+        });
+      }
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
@@ -61,6 +67,24 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       title: 'Planos',
       subtitle: 'Preços e recursos oferecidos às empresas.',
       actions: [
+        if (_selected.isNotEmpty) ...[
+          Text(
+            '${_selected.length} selecionado(s)',
+            style: typo.caption12.copyWith(color: ext.textMuted),
+          ),
+          FormaButton.secondary(
+            label: 'Ativar',
+            small: true,
+            icon: const Icon(Icons.play_circle_outline, size: 16),
+            onPressed: () => unawaited(_bulk(active: true)),
+          ),
+          FormaButton.secondary(
+            label: 'Desativar',
+            small: true,
+            icon: const Icon(Icons.pause_circle_outline, size: 16),
+            onPressed: () => unawaited(_bulk(active: false)),
+          ),
+        ],
         FormaButton.secondary(
           label: 'Usar template',
           small: true,
@@ -81,6 +105,17 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
               rows: plans ?? const [],
               onRowTap: (p) => unawaited(_details(p)),
               columns: [
+                FormaColumn(
+                  id: 'select',
+                  label: '',
+                  width: 44,
+                  cellBuilder: (_, p) => FormaCheckbox(
+                    value: _selected.contains(p.id),
+                    onChanged: (v) => setState(
+                      () => v ? _selected.add(p.id) : _selected.remove(p.id),
+                    ),
+                  ),
+                ),
                 FormaColumn(
                   id: 'name',
                   label: 'Plano',
@@ -145,6 +180,11 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                       ),
                     ),
                   ),
+                  FormaMenuItem(
+                    label: 'Migrar empresas…',
+                    icon: Icons.swap_horiz_rounded,
+                    onTap: () => unawaited(_migrate(p)),
+                  ),
                   const FormaMenuItem.divider(),
                   FormaMenuItem(
                     label: 'Excluir',
@@ -160,6 +200,96 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
               ),
             ),
     );
+  }
+
+  Future<void> _bulk({required bool active}) async {
+    final ids = _selected.toList();
+    await _run(
+      active
+          ? '${ids.length} plano(s) ativado(s)'
+          : '${ids.length} plano(s) desativado(s)',
+      () => _repo.setPlansActive(ids, active: active),
+    );
+    if (mounted) setState(_selected.clear);
+  }
+
+  /// Move todas as empresas de [from] para outro plano.
+  Future<void> _migrate(Plan from) async {
+    final targets = (_plans ?? const <Plan>[])
+        .where((p) => p.id != from.id && p.isActive)
+        .toList();
+    if (targets.isEmpty) {
+      Toasts.info(
+        context,
+        'Não há outro plano ativo para receber as empresas.',
+      );
+      return;
+    }
+    String? toId = targets.first.id;
+    var notify = true;
+    final reason = TextEditingController();
+    final result = await showFormDialog<PlanMigration>(
+      context,
+      title: 'Migrar empresas',
+      description: 'Todas as empresas do plano "${from.name}" serão movidas.',
+      submitLabel: 'Criar migração',
+      fields: (setState) => [
+        FormaSelect<String>(
+          label: 'Plano de destino',
+          value: toId,
+          options: [
+            for (final p in targets)
+              FormaSelectOption(
+                value: p.id,
+                label: p.name,
+                subtitle: '${Fmt.money(p.price)}${p.cycleLabel}',
+              ),
+          ],
+          onChanged: (v) => setState(() => toId = v),
+        ),
+        FormaTextField(
+          label: 'Motivo',
+          controller: reason,
+          maxLines: 2,
+          validator: requiredValidator,
+        ),
+        FormaCheckbox(
+          value: notify,
+          label: 'Avisar os usuários por e-mail',
+          onChanged: (v) => setState(() => notify = v),
+        ),
+      ],
+      onSubmit: () => _repo.createMigration(
+        fromPlanId: from.id,
+        toPlanId: toId!,
+        reason: reason.text,
+        notifyUsers: notify,
+      ),
+    );
+    if (result == null || !mounted) return;
+    final execute = await FormaConfirmDialog.show(
+      context,
+      title: 'Executar migração agora?',
+      message:
+          '${result.total} empresa(s) de "${result.fromPlan ?? from.name}" '
+          'para "${result.toPlan ?? ''}". Status: ${result.statusLabel}.',
+      confirmLabel: 'Executar',
+      cancelLabel: 'Depois',
+    );
+    if (!execute || !mounted) return;
+    try {
+      final done = await _repo.executeMigration(result.id);
+      await _load();
+      if (mounted) {
+        Toasts.success(
+          context,
+          'Migração ${done.statusLabel.toLowerCase()}',
+          description: '${done.successful} ok · ${done.failed} com falha',
+        );
+      }
+    } on ApiError catch (e) {
+      if (mounted) Toasts.error(context, e);
+    }
   }
 
   Future<void> _delete(Plan p) async {
@@ -329,11 +459,31 @@ class _PlanSheetState extends State<_PlanSheet> {
   PlanStats? _stats;
   List<AdminCompany> _companies = const [];
   String? _error;
+  ReportPeriod _period = ReportPeriod.monthly;
+  PlanFinancialReport? _report;
+  String? _reportError;
+
+  Future<void> _loadReport() async {
+    setState(() {
+      _report = null;
+      _reportError = null;
+    });
+    try {
+      final r = await di<AdminRepository>().planFinancialReport(
+        widget.plan.id,
+        period: _period,
+      );
+      if (mounted) setState(() => _report = r);
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _reportError = e.message);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+    unawaited(_loadReport());
   }
 
   Future<void> _load() async {
@@ -403,6 +553,34 @@ class _PlanSheetState extends State<_PlanSheet> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Financeiro',
+                        style: typo.title15.copyWith(color: ext.textPrimary),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 160,
+                      child: FormaSelect<ReportPeriod>(
+                        value: _period,
+                        options: [
+                          for (final rp in ReportPeriod.values)
+                            FormaSelectOption(value: rp, label: rp.label),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => _period = v);
+                          unawaited(_loadReport());
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _FinancialSection(report: _report, error: _reportError),
                 const SizedBox(height: 20),
                 Text(
                   'Recursos',
@@ -450,6 +628,159 @@ class _PlanSheetState extends State<_PlanSheet> {
                     ),
               ],
             ),
+    );
+  }
+}
+
+class _FinancialSection extends StatelessWidget {
+  const _FinancialSection({required this.report, required this.error});
+
+  final PlanFinancialReport? report;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    if (error != null) {
+      return Text(error!, style: typo.body13.copyWith(color: ext.errorColor));
+    }
+    final r = report;
+    if (r == null) return const FormaSkeleton.box(height: 180);
+
+    final maxRevenue = r.trends.fold<double>(
+      1,
+      (m, t) => t.revenue > m ? t.revenue : m,
+    );
+    Widget metric(String label, String value, {Color? color}) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: typo.caption12.copyWith(color: ext.textMuted)),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: typo.title15.copyWith(color: color ?? ext.textPrimary),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            metric('Receita do período', Fmt.money(r.current)),
+            metric('Período anterior', Fmt.money(r.previous)),
+            metric(
+              'Crescimento',
+              '${r.growth >= 0 ? '+' : ''}${Fmt.percent(r.growth)}',
+              color: r.growth >= 0 ? ext.successText : ext.errorText,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            metric('Por empresa', Fmt.money(r.averagePerUser)),
+            metric('Total histórico', Fmt.money(r.lifetime)),
+            metric('Retenção', Fmt.percent(r.retentionRate)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            metric('Novas', '${r.newSubscriptions}'),
+            metric('Canceladas', '${r.cancelled}'),
+            metric('Conversão', Fmt.percent(r.conversionRate)),
+          ],
+        ),
+        if (r.trends.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 96,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final t in r.trends)
+                  Expanded(
+                    child: Tooltip(
+                      message:
+                          '${t.period}: ${Fmt.money(t.revenue)} · '
+                          '${t.subscriptions} assinaturas',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Flexible(
+                              child: FractionallySizedBox(
+                                heightFactor: (t.revenue / maxRevenue).clamp(
+                                  0.03,
+                                  1,
+                                ),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: ext.primaryColor.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              t.period,
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: typo.caption12.copyWith(
+                                color: ext.textHint,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: ext.appBackground,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Projeção',
+                style: typo.caption12Med.copyWith(color: ext.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Próximo mês ${Fmt.money(r.nextMonth)} · '
+                'trimestre ${Fmt.money(r.nextQuarter)} · '
+                'ano ${Fmt.money(r.nextYear)}',
+                style: typo.body13.copyWith(color: ext.textMuted),
+              ),
+              if (r.methodology != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  r.methodology!,
+                  style: typo.caption12.copyWith(color: ext.textHint),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

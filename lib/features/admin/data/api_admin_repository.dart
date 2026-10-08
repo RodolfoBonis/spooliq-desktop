@@ -133,4 +133,43 @@ class ApiAdminRepository implements AdminRepository {
     '/admin/subscription-plans/from-template',
     body: {'template_id': templateId, 'reason': 'Criado a partir de template'},
   );
+
+  @override
+  Future<PlanFinancialReport> planFinancialReport(
+    String id, {
+    ReportPeriod period = ReportPeriod.monthly,
+  }) async => PlanFinancialReport.fromJson(
+    await _api.getJson(
+      '/admin/subscription-plans/$id/financial-report',
+      query: {'period': period.value},
+    ),
+  );
+
+  @override
+  Future<PlanMigration> createMigration({
+    required String fromPlanId,
+    required String toPlanId,
+    required String reason,
+    bool notifyUsers = true,
+    DateTime? scheduledFor,
+  }) async => PlanMigration.fromJson(
+    await _api.postJson(
+      '/admin/subscription-plans/migrate',
+      body: compactJson({
+        'from_plan_id': fromPlanId,
+        'to_plan_id': toPlanId,
+        'reason': reason.trim(),
+        'notify_users': notifyUsers,
+        'scheduled_for': scheduledFor?.toUtc().toIso8601String(),
+      }),
+    ),
+  );
+
+  @override
+  Future<PlanMigration> executeMigration(String migrationId) async =>
+      PlanMigration.fromJson(
+        await _api.postJson(
+          '/admin/subscription-plans/migrations/$migrationId/execute',
+        ),
+      );
 }
