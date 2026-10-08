@@ -13,7 +13,7 @@ import 'package:spooliq_desktop/features/users/domain/app_user.dart';
 void main() {
   group('Customer', () {
     test('reads the list wrapper with budget aggregates', () {
-      final c = Customer.fromJson({
+      final c = Customer.fromJson(const {
         'customer': {
           'id': 'c1',
           'name': 'Ana Maria Souza',
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('reads a plain customer object', () {
-      final c = Customer.fromJson({'id': 'c2', 'name': 'Jadir'});
+      final c = Customer.fromJson(const {'id': 'c2', 'name': 'Jadir'});
       expect(c.id, 'c2');
       expect(c.isActive, isTrue);
       expect(c.budgetCount, 0);
@@ -59,7 +59,7 @@ void main() {
 
   group('Filament', () {
     test('reads nested brand/material and price in cents', () {
-      final f = Filament.fromJson({
+      final f = Filament.fromJson(const {
         'id': 'f1',
         'name': 'PLA Basic',
         'brand_id': 'b',
@@ -89,7 +89,7 @@ void main() {
     });
 
     test('stock movement keeps the sign', () {
-      final m = StockMovement.fromJson({
+      final m = StockMovement.fromJson(const {
         'id': 's',
         'type': 'consumption',
         'grams': -380.5,
@@ -103,7 +103,7 @@ void main() {
 
   group('Preset', () {
     test('keeps only schema fields for the type', () {
-      final p = Preset.fromJson({
+      final p = Preset.fromJson(const {
         'id': 'p',
         'name': 'Bambu A1',
         'type': 'machine',
@@ -118,7 +118,7 @@ void main() {
     });
 
     test('reads values nested under the type key', () {
-      final p = Preset.fromJson({
+      final p = Preset.fromJson(const {
         'id': 'p',
         'name': 'Equatorial',
         'type': 'energy',
@@ -131,7 +131,7 @@ void main() {
 
   group('Company', () {
     test('current_plan comes as an object', () {
-      final c = Company.fromJson({
+      final c = Company.fromJson(const {
         'id': 'c',
         'name': 'Artesier',
         'subscription_status': 'payment_pending',
@@ -142,7 +142,7 @@ void main() {
     });
 
     test('branding round-trips the color slots', () {
-      final b = CompanyBranding.fromJson({
+      final b = CompanyBranding.fromJson(const {
         'template_name': 'coral',
         'primary_color': '#FF6B6B',
       }).withColor('accent_color', '#26C5C5');
@@ -156,7 +156,7 @@ void main() {
 
   group('Billing & admin', () {
     test('plan features and cycle label', () {
-      final p = Plan.fromJson({
+      final p = Plan.fromJson(const {
         'id': 'p',
         'name': 'Pro',
         'price': 49.9,
@@ -171,17 +171,17 @@ void main() {
 
     test('payment status labels', () {
       expect(
-        Payment.fromJson({'id': 'x', 'status': 'RECEIVED'}).isPaid,
+        Payment.fromJson(const {'id': 'x', 'status': 'RECEIVED'}).isPaid,
         isTrue,
       );
       expect(
-        Payment.fromJson({'id': 'x', 'status': 'OVERDUE'}).statusLabel,
+        Payment.fromJson(const {'id': 'x', 'status': 'OVERDUE'}).statusLabel,
         'Vencido',
       );
     });
 
     test('admin company reads plan object and company_name alias', () {
-      final c = AdminCompany.fromJson({
+      final c = AdminCompany.fromJson(const {
         'organization_id': 'o',
         'company_name': 'Artesier',
         'subscription_status': 'trial',
@@ -193,7 +193,7 @@ void main() {
     });
 
     test('financial report and migration', () {
-      final r = PlanFinancialReport.fromJson({
+      final r = PlanFinancialReport.fromJson(const {
         'revenue': {'current_period': 990, 'growth_percentage': 12.5},
         'trends': [
           {'period': '2026-09', 'revenue': 800, 'subscriptions': 16},
@@ -202,7 +202,7 @@ void main() {
       expect(r.current, 990);
       expect(r.trends.single.subscriptions, 16);
       expect(
-        PlanMigration.fromJson({
+        PlanMigration.fromJson(const {
           'migration_id': 'm',
           'status': 'completed',
         }).statusLabel,
@@ -213,7 +213,7 @@ void main() {
 
   group('Dashboard, users and slicer', () {
     test('overview groups counts by status', () {
-      final o = Overview.fromJson({
+      final o = Overview.fromJson(const {
         'total_revenue': 8029,
         'budgets_by_status': [
           {'status': 'sent', 'count': 2},
@@ -224,7 +224,7 @@ void main() {
     });
 
     test('app user types', () {
-      final u = AppUser.fromJson({
+      final u = AppUser.fromJson(const {
         'id': 'u',
         'name': 'Ana',
         'email': 'a@b.c',
@@ -235,7 +235,7 @@ void main() {
     });
 
     test('slice analysis reads plates and catalog suggestions', () {
-      final a = SliceAnalysis.fromJson({
+      final a = SliceAnalysis.fromJson(const {
         'slicer': {'name': 'BambuStudio', 'version': '2.8'},
         'plates': [
           {
@@ -263,7 +263,7 @@ void main() {
     });
 
     test('model 3D size label and tags', () {
-      final m = Model3D.fromJson({
+      final m = Model3D.fromJson(const {
         'id': 'm',
         'name': 'Hulk',
         'file_name': 'hulk.3mf',

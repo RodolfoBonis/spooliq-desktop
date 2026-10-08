@@ -1,3 +1,7 @@
+// Matemática vetorial densa: várias variáveis por linha deixam o código
+// mais legível que uma declaração por linha.
+// ignore_for_file: avoid_multiple_declarations_per_line
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -102,7 +106,8 @@ class _ModelViewerState extends State<ModelViewer> {
     setState(() {
       if (_panning) {
         final scale = _cam.distance / 600;
-        final cy = math.cos(_cam.yaw), sy = math.sin(_cam.yaw);
+        final cy = math.cos(_cam.yaw);
+        final sy = math.sin(_cam.yaw);
         _cam.target[0] -= (delta.dx * cy) * scale;
         _cam.target[1] -= (delta.dx * -sy) * scale;
         _cam.target[2] += delta.dy * scale;
@@ -202,7 +207,8 @@ class _ScenePainter extends CustomPainter {
 
     // Base da câmera (Z para cima).
     final cy = math.cos(cam.yaw), sy = math.sin(cam.yaw);
-    final cp = math.cos(cam.pitch), sp = math.sin(cam.pitch);
+    final cp = math.cos(cam.pitch);
+    final sp = math.sin(cam.pitch);
     // Posição do olho.
     final ex = cam.target[0] + cam.distance * cp * cy;
     final ey = cam.target[1] + cam.distance * cp * sy;
@@ -215,20 +221,25 @@ class _ScenePainter extends CustomPainter {
     fx /= fl;
     fy /= fl;
     fz /= fl;
-    var rx = fy, ry = -fx, rz = 0.0; // forward × Z
+    var rx = fy;
+    var ry = -fx;
+    const rz = 0.0; // forward × Z
     final rl = math.sqrt(rx * rx + ry * ry) + 1e-9;
     rx /= rl;
     ry /= rl;
-    final ux = ry * fz - rz * fy,
-        uy = rz * fx - rx * fz,
-        uz = rx * fy - ry * fx;
+    final ux = ry * fz - rz * fy;
+    final uy = rz * fx - rx * fz;
+    final uz = rx * fy - ry * fx;
 
     final focal = size.shortestSide * 1.1;
-    final cx = size.width / 2, cyy = size.height / 2;
+    final cx = size.width / 2;
+    final cyy = size.height / 2;
 
     // Projeta um ponto: retorna (sx, sy, depth); depth <= 0 → atrás.
     (double, double, double) project(double x, double y, double z) {
-      final dx = x - ex, dy = y - ey, dz = z - ez;
+      final dx = x - ex;
+      final dy = y - ey;
+      final dz = z - ez;
       final d = dx * fx + dy * fy + dz * fz;
       final px = dx * rx + dy * ry + dz * rz;
       final py = dx * ux + dy * uy + dz * uz;
@@ -267,8 +278,10 @@ class _ScenePainter extends CustomPainter {
       ..strokeWidth = 1.6;
     for (var v = -h; v <= h + 0.01; v += 10) {
       final isMajor = (v.round() % 50) == 0;
-      final a = project(v, -h, 0), b = project(v, h, 0);
-      final c = project(-h, v, 0), d = project(h, v, 0);
+      final a = project(v, -h, 0);
+      final b = project(v, h, 0);
+      final c = project(-h, v, 0);
+      final d = project(h, v, 0);
       canvas
         ..drawLine(
           Offset(a.$1, a.$2),
@@ -296,7 +309,8 @@ class _ScenePainter extends CustomPainter {
     final depth = Float32List(n);
     final shade = Float32List(n);
     final visible = Uint8List(n);
-    var minD = double.infinity, maxD = 0.0;
+    var minD = double.infinity;
+    var maxD = 0.0;
 
     // Luz: vinda do observador, um pouco de cima.
     const lx = 0.3, ly = 0.4, lz = 0.866;
@@ -304,12 +318,20 @@ class _ScenePainter extends CustomPainter {
     final perTri = mesh.triangleColors;
     for (var t = 0; t < n; t++) {
       final o = t * 9;
-      final ax = p[o], ay = p[o + 1], az = p[o + 2];
-      final bx = p[o + 3], by = p[o + 4], bz = p[o + 5];
-      final qx = p[o + 6], qy = p[o + 7], qz = p[o + 8];
+      final ax = p[o];
+      final ay = p[o + 1];
+      final az = p[o + 2];
+      final bx = p[o + 3];
+      final by = p[o + 4];
+      final bz = p[o + 5];
+      final qx = p[o + 6];
+      final qy = p[o + 7];
+      final qz = p[o + 8];
       // Normal da face.
       final e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-      final e2x = qx - ax, e2y = qy - ay, e2z = qz - az;
+      final e2x = qx - ax;
+      final e2y = qy - ay;
+      final e2z = qz - az;
       var nx = e1y * e2z - e1z * e2y;
       var ny = e1z * e2x - e1x * e2z;
       var nz = e1x * e2y - e1y * e2x;

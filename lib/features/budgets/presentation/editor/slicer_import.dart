@@ -30,7 +30,7 @@ class SlicerImport {
         RegExp(r'\.(gcode\.3mf|3mf|gcode)$', caseSensitive: false),
         '',
       )
-      .replaceAll(RegExp(r'[_-]+'), ' ')
+      .replaceAll(RegExp('[_-]+'), ' ')
       .trim();
 }
 
@@ -218,6 +218,9 @@ class _AnalyzeProgressState extends State<_AnalyzeProgress> {
   }
 }
 
+double _plateGrams(SlicePlate p) =>
+    p.filaments.fold<double>(0, (s, f) => s + f.grams);
+
 class _PlatePicker extends StatefulWidget {
   const _PlatePicker({required this.analysis});
 
@@ -252,7 +255,7 @@ class _PlatePickerState extends State<_PlatePicker> {
                     label: p.name.isEmpty ? 'Placa ${p.index}' : p.name,
                     description:
                         '${Fmt.duration(p.hours, p.minutes)} · '
-                        '${Fmt.grams(p.filaments.fold<double>(0, (s, f) => s + f.grams))}',
+                        '${Fmt.grams(_plateGrams(p))}',
                     onChanged: (v) => setState(
                       () => v
                           ? _selected.add(p.index)

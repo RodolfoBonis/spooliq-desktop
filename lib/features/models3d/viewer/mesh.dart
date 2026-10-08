@@ -16,7 +16,12 @@ class Mesh {
   /// Cor ARGB por triângulo (ex.: pintura multicolor do Bambu Studio).
   /// `null` = usar a cor padrão do visualizador.
   final Int32List? triangleColors;
-  late final double minX, minY, minZ, maxX, maxY, maxZ;
+  late final double minX;
+  late final double minY;
+  late final double minZ;
+  late final double maxX;
+  late final double maxY;
+  late final double maxZ;
 
   int get triangleCount => positions.length ~/ 9;
 
@@ -27,11 +32,17 @@ class Mesh {
       math.sqrt(sizeX * sizeX + sizeY * sizeY + sizeZ * sizeZ) / 2;
 
   void _computeBounds() {
-    var x0 = double.infinity, y0 = double.infinity, z0 = double.infinity;
-    var x1 = -double.infinity, y1 = -double.infinity, z1 = -double.infinity;
+    var x0 = double.infinity;
+    var y0 = double.infinity;
+    var z0 = double.infinity;
+    var x1 = -double.infinity;
+    var y1 = -double.infinity;
+    var z1 = -double.infinity;
     final p = positions;
     for (var i = 0; i < p.length; i += 3) {
-      final x = p[i], y = p[i + 1], z = p[i + 2];
+      final x = p[i];
+      final y = p[i + 1];
+      final z = p[i + 2];
       if (x < x0) x0 = x;
       if (y < y0) y0 = y;
       if (z < z0) z0 = z;
@@ -86,7 +97,9 @@ class Mesh {
     final keys = Int64List(n * 3);
     final p = positions;
     for (var v = 0; v < n * 3; v++) {
-      final x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
+      final x = p[v * 3];
+      final y = p[v * 3 + 1];
+      final z = p[v * 3 + 2];
       final k = key(x, y, z);
       keys[v] = k;
       final acc = sums.putIfAbsent(k, () => [0, 0, 0, 0]);
@@ -100,7 +113,9 @@ class Mesh {
     final outColors = <int>[];
     final seen = <String>{};
     for (var t = 0; t < n; t++) {
-      final a = keys[t * 3], b = keys[t * 3 + 1], c = keys[t * 3 + 2];
+      final a = keys[t * 3];
+      final b = keys[t * 3 + 1];
+      final c = keys[t * 3 + 2];
       if (a == b || b == c || a == c) continue;
       // Ordena para deduplicar o mesmo triângulo colapsado.
       final sorted = [a, b, c]..sort();
@@ -122,7 +137,8 @@ class Mesh {
 
   /// Centraliza em XY e apoia na mesa (z mínimo = 0).
   Mesh placedOnPlate() {
-    final cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    final cx = (minX + maxX) / 2;
+    final cy = (minY + maxY) / 2;
     final out = Float32List(positions.length);
     for (var i = 0; i < positions.length; i += 3) {
       out[i] = positions[i] - cx;
@@ -257,7 +273,9 @@ Mesh parse3mf(Uint8List bytes) {
             b + 2 < verts.length &&
             c + 2 < verts.length) {
           for (final i in [a, b, c]) {
-            final x = verts[i], y = verts[i + 1], z = verts[i + 2];
+            final x = verts[i];
+            final y = verts[i + 1];
+            final z = verts[i + 2];
             out
               ..add(m[0] * x + m[3] * y + m[6] * z + m[9])
               ..add(m[1] * x + m[4] * y + m[7] * z + m[10])

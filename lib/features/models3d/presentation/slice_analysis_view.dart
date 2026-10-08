@@ -67,7 +67,10 @@ class SliceAnalysisView extends StatelessWidget {
                     Icon(Icons.schedule_rounded, size: 14, color: ext.textHint),
                     const SizedBox(width: 4),
                     Text(
-                      '${Fmt.duration(p.hours, p.minutes)}${p.estimated ? ' (estimado)' : ''}',
+                      [
+                        Fmt.duration(p.hours, p.minutes),
+                        if (p.estimated) '(estimado)',
+                      ].join(' '),
                       style: typo.caption12.copyWith(color: ext.textMuted),
                     ),
                   ],

@@ -84,7 +84,8 @@ class _ProfilesPageState extends State<ProfilesPage> {
                 icon: Icons.tune_outlined,
                 title: 'Nenhum perfil ainda',
                 message:
-                    'Crie presets de máquina e energia e combine-os em um perfil.',
+                    'Crie presets de máquina e energia e combine-os em '
+                    'um perfil.',
                 action: canManage
                     ? FormaButton.primary(
                         label: 'Criar perfil',
