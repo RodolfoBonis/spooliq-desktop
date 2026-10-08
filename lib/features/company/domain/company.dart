@@ -76,8 +76,7 @@ class Company extends Equatable {
       subscriptionStatus: SubscriptionStatus.fromValue(
         j.strOrNull('subscription_status'),
       ),
-      currentPlan:
-          j.strOrNull('current_plan') ?? j.strOrNull('subscription_plan'),
+      currentPlan: planNameOf(j),
       trialEndsAt: j.date('trial_ends_at'),
       isPlatformCompany: j.boolean('is_platform_company'),
     );

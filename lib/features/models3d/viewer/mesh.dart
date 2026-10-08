@@ -238,16 +238,16 @@ Mesh parse3mf(Uint8List bytes) {
     final meshStart = obj.indexOf('<mesh');
     if (meshStart >= 0) {
       final verts = <double>[];
-      var pos = obj.indexOf('<vertex', meshStart);
+      var pos = _nextTag(obj, 'vertex', meshStart);
       while (pos >= 0) {
         final end = obj.indexOf('>', pos);
         verts
           ..add(_attrNum(obj, pos, end, 'x'))
           ..add(_attrNum(obj, pos, end, 'y'))
           ..add(_attrNum(obj, pos, end, 'z'));
-        pos = obj.indexOf('<vertex', end);
+        pos = _nextTag(obj, 'vertex', end);
       }
-      pos = obj.indexOf('<triangle', meshStart);
+      pos = _nextTag(obj, 'triangle', meshStart);
       while (pos >= 0) {
         final end = obj.indexOf('>', pos);
         final a = _attrNum(obj, pos, end, 'v1').toInt() * 3;
@@ -274,17 +274,13 @@ Mesh parse3mf(Uint8List bytes) {
                 : 0,
           );
         }
-        pos = obj.indexOf('<triangle', end);
+        pos = _nextTag(obj, 'triangle', end);
       }
     }
 
-    var c = obj.indexOf('<component');
+    var c = _nextTag(obj, 'component', 0);
     while (c >= 0) {
       final end = obj.indexOf('>', c);
-      if (obj.startsWith('<components', c)) {
-        c = obj.indexOf('<component', end);
-        continue;
-      }
       final childPath =
           _attr(obj, c, end, 'p:path') ?? _attr(obj, c, end, 'path') ?? path;
       emitObject(
@@ -294,19 +290,19 @@ Mesh parse3mf(Uint8List bytes) {
         depth + 1,
         extruder,
       );
-      c = obj.indexOf('<component', end);
+      c = _nextTag(obj, 'component', end);
     }
   }
 
   final root = models[rootPath]!;
   final buildStart = root.indexOf('<build');
-  var item = buildStart < 0 ? -1 : root.indexOf('<item', buildStart);
+  var item = buildStart < 0 ? -1 : _nextTag(root, 'item', buildStart);
   if (item < 0) {
-    var o = root.indexOf('<object');
+    var o = _nextTag(root, 'object', 0);
     while (o >= 0) {
       final end = root.indexOf('>', o);
       emitObject(rootPath, _attr(root, o, end, 'id') ?? '', _identity, 0, 1);
-      o = root.indexOf('<object', end);
+      o = _nextTag(root, 'object', end);
     }
   }
   while (item >= 0) {
@@ -320,7 +316,7 @@ Mesh parse3mf(Uint8List bytes) {
       0,
       1,
     );
-    item = root.indexOf('<item', end);
+    item = _nextTag(root, 'item', end);
   }
 
   if (out.isEmpty) throw const MeshFormatException('O 3MF não contém malhas.');
@@ -334,16 +330,38 @@ Mesh parse3mf(Uint8List bytes) {
   );
 }
 
+/// Próxima tag `<name …>` exata a partir de [from] (ignora `<names>` etc.).
+int _nextTag(String s, String name, int from) {
+  final needle = '<$name';
+  var i = s.indexOf(needle, from < 0 ? 0 : from);
+  while (i >= 0) {
+    final after = i + needle.length;
+    if (after >= s.length) return -1;
+    final ch = s.codeUnitAt(after);
+    // espaço, tab, quebra de linha, '/' ou '>'
+    if (ch == 0x20 ||
+        ch == 0x09 ||
+        ch == 0x0A ||
+        ch == 0x0D ||
+        ch == 0x2F ||
+        ch == 0x3E) {
+      return i;
+    }
+    i = s.indexOf(needle, after);
+  }
+  return -1;
+}
+
 /// Recorta o elemento `<object id="…">…</object>` do XML.
 String? _findObject(String xml, String id) {
-  var pos = xml.indexOf('<object');
+  var pos = _nextTag(xml, 'object', 0);
   while (pos >= 0) {
     final end = xml.indexOf('>', pos);
     if (_attr(xml, pos, end, 'id') == id) {
       final close = xml.indexOf('</object>', end);
       return xml.substring(pos, close < 0 ? xml.length : close);
     }
-    pos = xml.indexOf('<object', end);
+    pos = _nextTag(xml, 'object', end);
   }
   return null;
 }
