@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
@@ -9,6 +11,8 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/draft_text_
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog_repository.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
+import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 
 /// Card de edição de um item (produto) do orçamento.
@@ -174,12 +178,34 @@ class ItemEditor extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                DraftTextField(
-                  label: 'Descrição para o cliente',
-                  hint: 'Aparece no PDF do orçamento',
-                  value: item.description,
-                  onChanged: (v) =>
-                      onChanged((i) => i.copyWith(description: v)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: DraftTextField(
+                        label: 'Descrição para o cliente',
+                        hint: 'Aparece no PDF do orçamento',
+                        value: item.description,
+                        onChanged: (v) =>
+                            onChanged((i) => i.copyWith(description: v)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: _ModelPicker(
+                        modelId: item.model3dId,
+                        modelName: item.model3dName,
+                        onChanged: (id, name) => onChanged(
+                          (i) => i.copyWith(
+                            model3dId: () => id,
+                            model3dName: () => name,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 const _Subheader('Filamentos', trailing: 'na ordem do AMS'),
@@ -297,6 +323,80 @@ class ItemEditor extends StatelessWidget {
       onChanged: (v) => onChanged((v ?? 0).toInt()),
     ),
   );
+}
+
+/// Vincula um modelo da biblioteca ao item, com atalho para o visualizador.
+class _ModelPicker extends StatelessWidget {
+  const _ModelPicker({
+    required this.modelId,
+    required this.modelName,
+    required this.onChanged,
+  });
+
+  final String? modelId;
+  final String? modelName;
+  final void Function(String? id, String? name) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: FormaCombobox<Model3D>(
+            label: 'Modelo 3D',
+            hint: 'Vincular da biblioteca…',
+            value: modelId == null
+                ? null
+                : FormaSelectOption(
+                    value: Model3D.ref(
+                      modelId!,
+                      modelName ?? 'Modelo vinculado',
+                    ),
+                    label: modelName ?? 'Modelo vinculado',
+                  ),
+            search: (q) async {
+              final page = await di<Model3DRepository>().list(
+                page: PageQuery(pageSize: 12, search: q.isEmpty ? null : q),
+              );
+              return [
+                for (final m in page.items)
+                  FormaSelectOption(
+                    value: m,
+                    label: m.name,
+                    subtitle: '${m.format} · ${m.sizeLabel}',
+                    leading: const Icon(Icons.view_in_ar_outlined, size: 18),
+                  ),
+              ];
+            },
+            onChanged: (opt) => onChanged(opt?.value.id, opt?.value.name),
+          ),
+        ),
+        if (modelId != null) ...[
+          const SizedBox(width: 4),
+          Tooltip(
+            message: 'Ver em 3D',
+            child: IconButton(
+              icon: const Icon(Icons.threed_rotation_rounded, size: 20),
+              onPressed: () => unawaited(
+                showModelViewerDialog(
+                  context,
+                  Model3D.ref(modelId!, modelName ?? 'Modelo 3D'),
+                ),
+              ),
+            ),
+          ),
+          Tooltip(
+            message: 'Desvincular',
+            child: IconButton(
+              icon: const Icon(Icons.link_off_rounded, size: 18),
+              onPressed: () => onChanged(null, null),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _Subheader extends StatelessWidget {

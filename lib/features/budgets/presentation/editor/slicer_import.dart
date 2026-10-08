@@ -12,10 +12,18 @@ import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 
 /// Resultado da importação: placas escolhidas + nome sugerido do produto.
 class SlicerImport {
-  const SlicerImport({required this.plates, required this.fileName});
+  const SlicerImport({
+    required this.plates,
+    required this.fileName,
+    required this.filePath,
+  });
 
   final List<SlicePlate> plates;
   final String fileName;
+  final String filePath;
+
+  /// A biblioteca de modelos aceita STL e 3MF (inclui `.gcode.3mf`).
+  bool get canSaveToLibrary => fileName.toLowerCase().endsWith('.3mf');
 
   String get productName => fileName
       .replaceAll(
@@ -57,7 +65,11 @@ Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
   if (!context.mounted || analysis.plates.isEmpty) return null;
 
   if (analysis.plates.length == 1) {
-    return SlicerImport(plates: analysis.plates, fileName: file.name);
+    return SlicerImport(
+      plates: analysis.plates,
+      fileName: file.name,
+      filePath: file.path,
+    );
   }
   final plates = await FormaDialog.show<List<SlicePlate>>(
     context,
@@ -69,7 +81,11 @@ Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
     child: _PlatePicker(analysis: analysis),
   );
   if (plates == null || plates.isEmpty) return null;
-  return SlicerImport(plates: plates, fileName: file.name);
+  return SlicerImport(
+    plates: plates,
+    fileName: file.name,
+    filePath: file.path,
+  );
 }
 
 /// Faz a análise dentro do diálogo e fecha com o resultado.

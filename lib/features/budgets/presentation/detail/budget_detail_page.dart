@@ -20,6 +20,8 @@ import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_sta
 import 'package:spooliq_desktop/features/budgets/presentation/widgets/cost_breakdown.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
+import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
 
 class BudgetDetailPage extends StatelessWidget {
   const BudgetDetailPage({required this.id, super.key});
@@ -326,6 +328,19 @@ class _ItemCard extends StatelessWidget {
                     '${Fmt.cents(item.saleUnitPriceCents)} / un.',
                     style: muted,
                   ),
+                  if (item.model3dId != null) ...[
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      onPressed: () => unawaited(
+                        showModelViewerDialog(
+                          context,
+                          Model3D.ref(item.model3dId!, item.productName),
+                        ),
+                      ),
+                      icon: const Icon(Icons.threed_rotation_rounded, size: 16),
+                      label: const Text('Ver modelo 3D'),
+                    ),
+                  ],
                 ],
               ),
             ],
