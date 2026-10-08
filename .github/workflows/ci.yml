@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+    # Tag vX.Y.Z (igual à versão do pubspec) publica uma Release com os instaladores.
+    tags: ['v*']
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -38,7 +40,7 @@ jobs:
             cmd: bash scripts/build_macos_dmg.sh
             artifact: dist/*.dmg
           - os: windows-latest
-            cmd: flutter build windows --release -t lib/main_production.dart && iscc /DAppVersion=0.1.0 windows\installer.iss
+            cmd: bash scripts/build_windows_installer.sh
             artifact: dist/*.exe
     runs-on: ${{ matrix.os }}
     steps:
@@ -49,9 +51,37 @@ jobs:
         run: dart pub token add https://pub.rodolfodebonis.com.br --env-var PUB_TOKEN
       - run: flutter pub get
       - run: ${{ matrix.cmd }}
+        shell: bash
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       - uses: actions/upload-artifact@v4
         with:
           name: spooliq-${{ runner.os }}
           path: ${{ matrix.artifact }}
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches pubspec version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME difere da versão do pubspec (v$VERSION)."
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "SpoolIQ $GITHUB_REF_NAME" --generate-notes
