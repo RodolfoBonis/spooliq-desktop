@@ -11,8 +11,8 @@ e a API SpoolIQ (`https://api.spooliq.com/v1`).
 ## Requisitos
 
 - Flutter 3.47.6 via [fvm](https://fvm.app) (`.fvmrc`)
-- Checkout do Forma ao lado deste repo (`../forma`, branch `feat/desktop-foundation`)
-  enquanto os pacotes desktop não forem publicados — veja `pubspec_overrides.yaml`
+- Token de leitura do pub privado do Forma:
+  `dart pub token add https://pub.rodolfodebonis.com.br` (no CI: secret `PUB_TOKEN`)
 - macOS: Xcode 16+. Windows: Visual Studio 2022 com "Desktop development with C++"
 
 ## Rodando

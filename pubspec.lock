@@ -386,41 +386,38 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  forma_core:
-    dependency: "direct overridden"
-    description:
-      path: "../forma/packages/forma_core"
-      relative: true
-    source: path
-    version: "2.0.2"
   forma_foundation:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
-      path: "../forma/packages/forma_foundation"
-      relative: true
-    source: path
-    version: "2.0.1"
+      name: forma_foundation
+      sha256: "083e7bb46eaf10347455eb1cddf571fc459bbcfcad7243e5f709a425ebc08251"
+      url: "https://pub.rodolfodebonis.com.br"
+    source: hosted
+    version: "2.1.0"
   forma_icons:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
-      path: "../forma/packages/forma_icons"
-      relative: true
-    source: path
-    version: "2.0.1"
+      name: forma_icons
+      sha256: "769ced2977ef1290a5d37bba0f9949910ad995886b543f506867d7752ba00da0"
+      url: "https://pub.rodolfodebonis.com.br"
+    source: hosted
+    version: "2.0.2"
   forma_theme_spooliq:
     dependency: "direct main"
     description:
-      path: "../forma/packages/forma_theme_spooliq"
-      relative: true
-    source: path
-    version: "0.1.0"
+      name: forma_theme_spooliq
+      sha256: "5a64ef3bf31f59567fb7a7883048a19c6b4f765e621817ba5f5085571c8e8655"
+      url: "https://pub.rodolfodebonis.com.br"
+    source: hosted
+    version: "0.1.1"
   forma_ui:
     dependency: "direct main"
     description:
-      path: "../forma/packages/forma_ui"
-      relative: true
-    source: path
-    version: "2.1.0"
+      name: forma_ui
+      sha256: bcc17c73cef3fd69b1458cba73a4716567de269dba0d94a8b8e0ba46dfc22614
+      url: "https://pub.rodolfodebonis.com.br"
+    source: hosted
+    version: "2.2.0"
   frontend_server_client:
     dependency: transitive
     description:
