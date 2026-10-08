@@ -17,7 +17,7 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => LoginCubit(di()),
+      create: (_) => LoginCubit(di(), di()),
       child: BlocListener<LoginCubit, LoginState>(
         listenWhen: (a, b) => b.user != null && a.user != b.user,
         listener: (context, state) {
@@ -43,6 +43,22 @@ class _LoginFormState extends State<_LoginForm> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadQuickLogin());
+  }
+
+  /// Preenche o e-mail lembrado e já abre o Touch ID / Windows Hello.
+  Future<void> _loadQuickLogin() async {
+    final cubit = context.read<LoginCubit>();
+    await cubit.load();
+    if (!mounted) return;
+    final saved = cubit.state.savedEmail;
+    if (saved != null && _email.text.isEmpty) _email.text = saved;
+    if (cubit.state.canQuickLogin) await cubit.quickLogin();
+  }
 
   @override
   void dispose() {
@@ -96,6 +112,39 @@ class _LoginFormState extends State<_LoginForm> {
             ),
             const SizedBox(height: 16),
           ],
+          if (state.canQuickLogin) ...[
+            FormaButton.primary(
+              label: 'Entrar com ${state.quickLoginLabel}',
+              icon: const Icon(Icons.fingerprint, size: 18),
+              width: double.infinity,
+              isLoading: state.submitting,
+              onPressed: () => unawaited(
+                context.read<LoginCubit>().quickLogin(),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: Text(
+                state.savedEmail!,
+                style: typo.caption12.copyWith(color: ext.textMuted),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(child: Divider(color: ext.border)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'ou use sua senha',
+                    style: typo.caption12.copyWith(color: ext.textMuted),
+                  ),
+                ),
+                Expanded(child: Divider(color: ext.border)),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
           FormaTextField(
             label: 'E-mail',
             hint: 'voce@empresa.com',
@@ -127,13 +176,30 @@ class _LoginFormState extends State<_LoginForm> {
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
           ),
+          if (state.quickLoginLabel != null) ...[
+            const SizedBox(height: 16),
+            FormaCheckbox(
+              value: state.remember,
+              label: 'Usar ${state.quickLoginLabel} nos próximos logins',
+              onChanged: (v) =>
+                  context.read<LoginCubit>().setRemember(value: v),
+            ),
+          ],
           const SizedBox(height: 24),
-          FormaButton.primary(
-            label: 'Entrar',
-            width: double.infinity,
-            isLoading: state.submitting,
-            onPressed: _submit,
-          ),
+          if (state.canQuickLogin)
+            FormaButton.secondary(
+              label: 'Entrar',
+              width: double.infinity,
+              isLoading: state.submitting,
+              onPressed: _submit,
+            )
+          else
+            FormaButton.primary(
+              label: 'Entrar',
+              width: double.infinity,
+              isLoading: state.submitting,
+              onPressed: _submit,
+            ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

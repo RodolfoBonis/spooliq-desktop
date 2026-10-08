@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:spooliq_desktop/core/auth/credential_vault.dart';
 import 'package:spooliq_desktop/core/auth/token_store.dart';
 import 'package:spooliq_desktop/core/config/app_config.dart';
 import 'package:spooliq_desktop/core/network/api_client.dart';
@@ -47,6 +48,7 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerSingleton<AppConfig>(config)
     ..registerSingleton<SharedPreferences>(prefs)
     ..registerSingleton<TokenStore>(tokens)
+    ..registerLazySingleton<CredentialVault>(BiometricCredentialVault.new)
     ..registerSingleton<SessionEvents>(events)
     ..registerSingleton<ApiClient>(api)
     ..registerLazySingleton<AuthRepository>(
