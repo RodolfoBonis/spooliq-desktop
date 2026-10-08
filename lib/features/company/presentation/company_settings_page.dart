@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/auth/permissions.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/format/masks.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
@@ -123,11 +124,13 @@ class _CompanySettingsPageState extends State<CompanySettingsPage> {
       Company Function(Company, String?) apply, {
       String? hint,
       int lines = 1,
+      PatternMask? mask,
     }) => _Field(
       key: ValueKey('$label-$_formVersion'),
       label: label,
       hint: hint,
-      value: value ?? '',
+      mask: mask,
+      value: (mask == null ? value : Masks.format(mask, value)) ?? '',
       lines: lines,
       enabled: canEdit,
       onChanged: (v) => _set((c) => apply(c, v.trim().isEmpty ? null : v)),
@@ -213,6 +216,7 @@ class _CompanySettingsPageState extends State<CompanySettingsPage> {
                               'CNPJ',
                               c.document,
                               (c, v) => c.copyWith(document: () => v),
+                              mask: Masks.cnpj,
                             ),
                           ],
                         ),
@@ -240,6 +244,7 @@ class _CompanySettingsPageState extends State<CompanySettingsPage> {
                               'Telefone',
                               c.phone,
                               (c, v) => c.copyWith(phone: () => v),
+                              mask: Masks.phone,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -248,6 +253,7 @@ class _CompanySettingsPageState extends State<CompanySettingsPage> {
                               'WhatsApp',
                               c.whatsapp,
                               (c, v) => c.copyWith(whatsapp: () => v),
+                              mask: Masks.phone,
                             ),
                           ),
                         ],
@@ -314,6 +320,7 @@ class _CompanySettingsPageState extends State<CompanySettingsPage> {
                               'CEP',
                               c.zipCode,
                               (c, v) => c.copyWith(zipCode: () => v),
+                              mask: Masks.cep,
                             ),
                           ),
                         ],
@@ -439,9 +446,11 @@ class _Field extends StatefulWidget {
     required this.enabled,
     this.hint,
     this.lines = 1,
+    this.mask,
     super.key,
   });
 
+  final PatternMask? mask;
   final String label;
   final String value;
   final String? hint;
@@ -469,6 +478,7 @@ class _FieldState extends State<_Field> {
     controller: _c,
     enabled: widget.enabled,
     maxLines: widget.lines,
+    inputFormatters: widget.mask == null ? null : [widget.mask!],
     onChanged: widget.onChanged,
   );
 }

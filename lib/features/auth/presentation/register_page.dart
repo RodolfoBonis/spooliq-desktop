@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/format/masks.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/features/auth/domain/auth_repository.dart';
@@ -248,7 +249,6 @@ class _RegisterPageState extends State<RegisterPage> {
   );
 
   Widget _company() {
-    final digits = [FilteringTextInputFormatter.digitsOnly];
     return Form(
       key: _companyForm,
       child: Column(
@@ -278,10 +278,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: _field(
                   'document',
                   'CNPJ',
-                  hint: 'Somente números',
-                  formatters: [...digits, LengthLimitingTextInputFormatter(14)],
-                  validate: (v) =>
-                      v.length != 14 ? 'CNPJ deve ter 14 dígitos' : null,
+                  hint: '00.000.000/0000-00',
+                  formatters: [Masks.cnpj],
+                  validate: (v) => Masks.digits(v).length != 14
+                      ? 'CNPJ deve ter 14 dígitos'
+                      : null,
                 ),
               ),
             ],
@@ -294,8 +295,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: _field(
                   'phone',
                   'Telefone',
+                  hint: '(00) 00000-0000',
                   keyboard: TextInputType.phone,
-                  formatters: [...digits, LengthLimitingTextInputFormatter(11)],
+                  formatters: [Masks.phone],
                 ),
               ),
               const SizedBox(width: 12),
@@ -304,8 +306,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: _field(
                   'zip',
                   'CEP',
-                  formatters: [...digits, LengthLimitingTextInputFormatter(8)],
-                  validate: (v) => v.length != 8 ? 'CEP inválido' : null,
+                  formatters: [Masks.cep],
+                  validate: (v) =>
+                      Masks.digits(v).length != 8 ? 'CEP inválido' : null,
                 ),
               ),
             ],

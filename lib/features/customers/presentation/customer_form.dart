@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/format/masks.dart';
 import 'package:spooliq_desktop/core/ui/form_dialog.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
@@ -12,12 +13,14 @@ Future<Customer?> showCustomerForm(BuildContext context, {Customer? customer}) {
   final ctrl = {
     'name': TextEditingController(text: c?.name),
     'email': TextEditingController(text: c?.email),
-    'phone': TextEditingController(text: c?.phone),
-    'document': TextEditingController(text: c?.document),
+    'phone': TextEditingController(text: Masks.format(Masks.phone, c?.phone)),
+    'document': TextEditingController(
+      text: Masks.format(Masks.document, c?.document),
+    ),
     'address': TextEditingController(text: c?.address),
     'city': TextEditingController(text: c?.city),
     'state': TextEditingController(text: c?.state),
-    'zip': TextEditingController(text: c?.zipCode),
+    'zip': TextEditingController(text: Masks.format(Masks.cep, c?.zipCode)),
     'notes': TextEditingController(text: c?.notes),
   };
   var active = c?.isActive ?? true;
@@ -55,8 +58,10 @@ Future<Customer?> showCustomerForm(BuildContext context, {Customer? customer}) {
           Expanded(
             child: FormaTextField(
               label: 'Telefone / WhatsApp',
+              hint: '(00) 00000-0000',
               controller: ctrl['phone'],
               keyboardType: TextInputType.phone,
+              inputFormatters: [Masks.phone],
             ),
           ),
         ],
@@ -89,7 +94,11 @@ Future<Customer?> showCustomerForm(BuildContext context, {Customer? customer}) {
           const SizedBox(width: 12),
           SizedBox(
             width: 140,
-            child: FormaTextField(label: 'CEP', controller: ctrl['zip']),
+            child: FormaTextField(
+              label: 'CEP',
+              controller: ctrl['zip'],
+              inputFormatters: [Masks.cep],
+            ),
           ),
         ],
       ),
