@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
@@ -19,8 +20,12 @@ class LoginPage extends StatelessWidget {
       create: (_) => LoginCubit(di()),
       child: BlocListener<LoginCubit, LoginState>(
         listenWhen: (a, b) => b.user != null && a.user != b.user,
-        listener: (context, state) =>
-            context.read<SessionCubit>().signedIn(state.user!),
+        listener: (context, state) {
+          // Fecha o contexto de autofill: o gerenciador de senhas oferece
+          // salvar/atualizar a credencial usada.
+          TextInput.finishAutofillContext();
+          context.read<SessionCubit>().signedIn(state.user!);
+        },
         child: const AuthLayout(child: _LoginForm()),
       ),
     );
@@ -98,7 +103,9 @@ class _LoginFormState extends State<_LoginForm> {
             autofocus: true,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.email],
+            // `username` primeiro: no macOS só ele vira o content type de
+            // usuário, que faz o AutoFill reconhecer o formulário de login.
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
           ),
           const SizedBox(height: 16),
           FormaTextField(
