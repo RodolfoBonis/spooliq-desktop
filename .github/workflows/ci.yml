@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Enquanto os pacotes desktop do Forma não são publicados, o app usa o
+  # checkout local (pubspec_overrides.yaml → ../forma). No CI o Forma é
+  # clonado em ./forma e o override é reescrito.
+  FORMA_REF: feat/desktop-foundation
+
+jobs:
+  check:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: RodolfoBonis/forma
+          ref: ${{ env.FORMA_REF }}
+          path: forma
+          token: ${{ secrets.FORMA_REPO_TOKEN }}
+      - name: Point overrides to ./forma
+        run: sed -i 's#\.\./forma/#forma/#' pubspec_overrides.yaml
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+      - name: Authenticate private pub
+        run: echo "${{ secrets.PUB_TOKEN }}" | dart pub token add https://pub.rodolfodebonis.com.br
+      - run: flutter pub get
+      - run: dart format --set-exit-if-changed lib test
+      - run: flutter analyze
+      - run: flutter test --coverage
+
+  build:
+    name: Build ${{ matrix.os }}
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            cmd: flutter build macos --release --flavor production -t lib/main_production.dart
+            artifact: build/macos/Build/Products/Release-production
+          - os: windows-latest
+            cmd: flutter build windows --release -t lib/main_production.dart
+            artifact: build/windows/x64/runner/Release
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: RodolfoBonis/forma
+          ref: ${{ env.FORMA_REF }}
+          path: forma
+          token: ${{ secrets.FORMA_REPO_TOKEN }}
+      - name: Point overrides to ./forma
+        shell: bash
+        run: sed -i.bak 's#\.\./forma/#forma/#' pubspec_overrides.yaml
+      - uses: kuhnroyal/flutter-fvm-config-action/setup@v3
+      - name: Authenticate private pub
+        shell: bash
+        run: echo "${{ secrets.PUB_TOKEN }}" | dart pub token add https://pub.rodolfodebonis.com.br
+      - run: flutter pub get
+      - run: ${{ matrix.cmd }}
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spooliq-${{ runner.os }}
+          path: ${{ matrix.artifact }}

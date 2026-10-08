@@ -1,0 +1,14 @@
+# Desenvolvimento local: usa o checkout do Forma (branch feat/desktop-foundation)
+# até os pacotes desktop serem publicados em pub.rodolfodebonis.com.br.
+# Remova este arquivo para usar as versões hospedadas.
+dependency_overrides:
+  forma_core:
+    path: ../forma/packages/forma_core
+  forma_foundation:
+    path: ../forma/packages/forma_foundation
+  forma_icons:
+    path: ../forma/packages/forma_icons
+  forma_theme_spooliq:
+    path: ../forma/packages/forma_theme_spooliq
+  forma_ui:
+    path: ../forma/packages/forma_ui

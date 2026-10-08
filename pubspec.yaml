@@ -1,0 +1,59 @@
+name: spooliq_desktop
+description: SpoolIQ Desktop — gestão completa de orçamentos de impressão 3D para macOS e Windows.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+dependencies:
+  archive: ^4.3.0
+  bloc: ^9.2.0
+  dio: ^5.9.0
+  equatable: ^2.0.7
+  file_selector: ^1.0.3
+  fl_chart: ^1.1.0
+  flutter:
+    sdk: flutter
+  flutter_bloc: ^9.1.1
+  flutter_localizations:
+    sdk: flutter
+  flutter_secure_storage: ^10.0.0
+  forma_theme_spooliq:
+    hosted: https://pub.rodolfodebonis.com.br
+    version: ^0.1.0
+  forma_ui:
+    hosted: https://pub.rodolfodebonis.com.br
+    version: ^2.1.0
+  get_it: ^8.0.3
+  go_router: ^17.0.0
+  google_fonts: ^6.3.0
+  intl: ^0.20.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  sentry_flutter: ^9.0.0
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.2
+  window_manager: ^0.5.0
+  xml: ^7.0.1
+
+dev_dependencies:
+  bloc_lint: ^0.4.1
+  bloc_test: ^10.0.0
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.5
+  very_good_analysis: ^10.2.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/InterVariable.ttf
+        - asset: assets/fonts/InterVariable-Italic.ttf
+          style: italic

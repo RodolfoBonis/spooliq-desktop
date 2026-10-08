@@ -1,0 +1,127 @@
+import 'dart:convert';
+
+import 'package:spooliq_desktop/core/network/json.dart';
+
+/// Payload real (anonimizado) de `GET /budgets/{id}`.
+Json budgetJson({
+  String id = 'b-1',
+  String status = 'draft',
+  int total = 25990,
+}) => {
+  'id': id,
+  'organization_id': 'org-1',
+  'name': 'Kit organizadores',
+  'description': 'Organizadores de mesa',
+  'customer_id': 'c-1',
+  'status': status,
+  'quote_number': 42,
+  'valid_until': '2026-10-30T23:59:59-03:00',
+  'public_token': null,
+  'profile_id': 'p-1',
+  'include_energy_cost': true,
+  'include_waste_cost': true,
+  'include_machine_cost': true,
+  'discount_type': 'percent',
+  'discount_value': 10,
+  'include_shipping': false,
+  'tax_rate': null,
+  'filament_cost': 8000,
+  'waste_cost': 300,
+  'energy_cost': 450,
+  'machine_cost': 600,
+  'setup_cost': 500,
+  'labor_cost': 2000,
+  'post_processing_cost': 0,
+  'packaging_cost': 200,
+  'quality_control_cost': 0,
+  'failure_cost': 150,
+  'overhead_cost': 1200,
+  'profit_amount': 9000,
+  'discount_amount': 2240,
+  'shipping_cost': 0,
+  'tax_amount': 1500,
+  'tax_rate_applied': 6,
+  'total_cost': total,
+  'base_price': 22400,
+  'owner_user_id': 'u-1',
+  'created_at': '2026-10-01T10:00:00Z',
+  'updated_at': '2026-10-02T10:00:00Z',
+  'customer': {'id': 'c-1', 'name': 'Ana Souza', 'email': 'ana@x.com'},
+  'profile': {'id': 'p-1', 'name': 'Bambu P1S'},
+  'machine_preset': {'id': 'm-1', 'name': 'P1S', 'type': 'machine'},
+  'cost_preset': null,
+  'items': [
+    {
+      'id': 'i-2',
+      'budget_id': id,
+      'product_name': 'Gaveteiro',
+      'product_quantity': 2,
+      'print_time_hours': 5,
+      'print_time_minutes': 30,
+      'print_time_display': '5h30m',
+      'setup_time_minutes': 10,
+      'manual_labor_minutes_total': 20,
+      'post_processing_minutes': 0,
+      'support_removal_minutes': 5,
+      'filament_cost': 8000,
+      'item_total_cost': 12200,
+      'unit_price': 6100,
+      'sale_unit_price': 12995,
+      'sale_total': 25990,
+      'order': 2,
+      'filaments': [
+        {
+          'filament_id': 'f-2',
+          'filament_name': 'PLA Basic',
+          'brand_name': 'Bambu',
+          'material_name': 'PLA',
+          'color': 'Branco',
+          'color_type': 'solid',
+          'color_hex': '#FFFFFF',
+          'quantity': 120.5,
+          'cost': 1500,
+          'order': 2,
+        },
+        {
+          'filament_id': 'f-1',
+          'filament_name': 'PLA Basic',
+          'brand_name': 'Bambu',
+          'material_name': 'PLA',
+          'color': 'Preto',
+          'color_type': 'solid',
+          'color_hex': '#000000',
+          'quantity': 300,
+          'cost': 6500,
+          'order': 1,
+        },
+      ],
+    },
+  ],
+  'status_history': [
+    {
+      'id': 'h-1',
+      'budget_id': id,
+      'previous_status': 'draft',
+      'new_status': 'sent',
+      'changed_by': 'u-1',
+      'created_at': '2026-10-02T10:00:00Z',
+    },
+  ],
+  'total_print_time_display': '5h30m',
+  'stock_warnings': [
+    {
+      'filament_id': 'f-1',
+      'filament_name': 'PLA Basic',
+      'color': 'Preto',
+      'required_grams': 600,
+      'available_grams': 250,
+    },
+  ],
+};
+
+/// JWT sem assinatura válida (o app só decodifica o payload).
+String fakeJwt(Map<String, Object?> payload) {
+  String enc(Object o) =>
+      base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
+  return '${enc({'alg': 'RS256'})}.${enc(payload)}.signature';
+}

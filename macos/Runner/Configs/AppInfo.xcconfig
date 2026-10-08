@@ -1,0 +1,7 @@
+// Application-level settings for the Runner target.
+// O nome exibido e o bundle id por flavor ficam no project.pbxproj
+// (FLAVOR_APP_NAME / PRODUCT_BUNDLE_IDENTIFIER).
+
+PRODUCT_NAME = SpoolIQ
+PRODUCT_BUNDLE_IDENTIFIER = br.com.loopcraft.spooliq-desktop
+PRODUCT_COPYRIGHT = Copyright © 2026 Loopcraft. Todos os direitos reservados.
