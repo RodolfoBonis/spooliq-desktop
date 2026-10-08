@@ -62,5 +62,5 @@ fvm flutter build windows --release -t lib/main_production.dart
 ```
 
 O CI (`.github/workflows/ci.yml`) roda analyze/test e gera os artefatos de macOS
-e Windows. Segredos: `FORMA_REPO_TOKEN`, `PUB_TOKEN`, `SENTRY_DSN`.
+e Windows. Segredos: `PUB_TOKEN` (pub privado) e `SENTRY_DSN` (opcional).
 Assinatura/notarização (macOS) e instalador MSIX (Windows) ainda não configurados.
