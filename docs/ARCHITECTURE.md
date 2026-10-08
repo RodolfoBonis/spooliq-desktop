@@ -2,8 +2,9 @@
 
 App Flutter desktop (macOS + Windows) para a API SpoolIQ (`https://api.spooliq.com/v1`,
 swagger em `../spooliq/docs/swagger.json`). UI sobre o design system **Forma**
-(`forma_ui` + `forma_theme_spooliq`, usados via `pubspec_overrides.yaml` apontando
-para `../forma` até a publicação).
+(`forma_ui` + `forma_theme_spooliq`, hospedados em `pub.rodolfodebonis.com.br`). Para
+testar mudanças locais do Forma, crie um `pubspec_overrides.yaml` (ignorado no git)
+apontando para `../forma/packages/*`.
 
 ## Estrutura
 

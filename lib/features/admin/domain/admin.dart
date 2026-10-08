@@ -149,6 +149,133 @@ class PlanTemplate extends Equatable {
   List<Object?> get props => [id];
 }
 
+enum ReportPeriod {
+  monthly('monthly', 'Mensal'),
+  quarterly('quarterly', 'Trimestral'),
+  yearly('yearly', 'Anual');
+
+  const ReportPeriod(this.value, this.label);
+
+  final String value;
+  final String label;
+}
+
+/// Relatório financeiro de um plano (valores em reais).
+class PlanFinancialReport extends Equatable {
+  const PlanFinancialReport({
+    required this.current,
+    required this.previous,
+    required this.growth,
+    required this.averagePerUser,
+    required this.lifetime,
+    required this.newSubscriptions,
+    required this.cancelled,
+    required this.churnRate,
+    required this.retentionRate,
+    required this.conversionRate,
+    required this.nextMonth,
+    required this.nextQuarter,
+    required this.nextYear,
+    required this.trends,
+    this.methodology,
+  });
+
+  factory PlanFinancialReport.fromJson(Json json) {
+    final j = json.unwrapData();
+    final r = j.obj('revenue') ?? const <String, dynamic>{};
+    final s = j.obj('subscriptions') ?? const <String, dynamic>{};
+    final p = j.obj('projections') ?? const <String, dynamic>{};
+    return PlanFinancialReport(
+      current: r.dbl('current_period'),
+      previous: r.dbl('previous_period'),
+      growth: r.dbl('growth_percentage'),
+      averagePerUser: r.dbl('average_per_user'),
+      lifetime: r.dbl('total_lifetime'),
+      newSubscriptions: s.integer('new_subscriptions'),
+      cancelled: s.integer('cancelled_subscriptions'),
+      churnRate: s.dbl('churn_rate'),
+      retentionRate: s.dbl('retention_rate'),
+      conversionRate: s.dbl('conversion_rate'),
+      nextMonth: p.dbl('next_month'),
+      nextQuarter: p.dbl('next_quarter'),
+      nextYear: p.dbl('next_year'),
+      methodology: p.strOrNull('methodology'),
+      trends: j.list(
+        'trends',
+        (t) => (
+          period: t.str('period'),
+          revenue: t.dbl('revenue'),
+          subscriptions: t.integer('subscriptions'),
+        ),
+      ),
+    );
+  }
+
+  final double current;
+  final double previous;
+  final double growth;
+  final double averagePerUser;
+  final double lifetime;
+  final int newSubscriptions;
+  final int cancelled;
+  final double churnRate;
+  final double retentionRate;
+  final double conversionRate;
+  final double nextMonth;
+  final double nextQuarter;
+  final double nextYear;
+  final String? methodology;
+  final List<({String period, double revenue, int subscriptions})> trends;
+
+  @override
+  List<Object?> get props => [current, previous, growth, trends];
+}
+
+/// Resultado de uma migração de empresas entre planos.
+class PlanMigration extends Equatable {
+  const PlanMigration({
+    required this.id,
+    required this.status,
+    required this.total,
+    required this.successful,
+    required this.failed,
+    this.fromPlan,
+    this.toPlan,
+  });
+
+  factory PlanMigration.fromJson(Json json) {
+    final j = json.unwrapData();
+    return PlanMigration(
+      id: j.str('migration_id'),
+      status: j.str('status'),
+      total: j.integer('total_companies'),
+      successful: j.integer('successful'),
+      failed: j.integer('failed'),
+      fromPlan: j.strOrNull('from_plan_name'),
+      toPlan: j.strOrNull('to_plan_name'),
+    );
+  }
+
+  final String id;
+  final String status;
+  final int total;
+  final int successful;
+  final int failed;
+  final String? fromPlan;
+  final String? toPlan;
+
+  String get statusLabel => switch (status) {
+    'scheduled' => 'Agendada',
+    'in_progress' => 'Em andamento',
+    'completed' => 'Concluída',
+    'failed' => 'Falhou',
+    _ => status,
+  };
+
+  @override
+  List<Object?> get props => [id, status, successful, failed];
+}
+
 abstract interface class AdminRepository {
   Future<AdminStats> stats();
   Future<Paginated<AdminCompany>> companies({
@@ -175,4 +302,16 @@ abstract interface class AdminRepository {
   Future<List<AdminCompany>> planCompanies(String id);
   Future<List<PlanTemplate>> planTemplates();
   Future<void> planFromTemplate(String templateId);
+  Future<PlanFinancialReport> planFinancialReport(
+    String id, {
+    ReportPeriod period = ReportPeriod.monthly,
+  });
+  Future<PlanMigration> createMigration({
+    required String fromPlanId,
+    required String toPlanId,
+    required String reason,
+    bool notifyUsers = true,
+    DateTime? scheduledFor,
+  });
+  Future<PlanMigration> executeMigration(String migrationId);
 }

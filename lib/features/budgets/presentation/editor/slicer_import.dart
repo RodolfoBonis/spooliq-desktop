@@ -12,17 +12,25 @@ import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 
 /// Resultado da importação: placas escolhidas + nome sugerido do produto.
 class SlicerImport {
-  const SlicerImport({required this.plates, required this.fileName});
+  const SlicerImport({
+    required this.plates,
+    required this.fileName,
+    required this.filePath,
+  });
 
   final List<SlicePlate> plates;
   final String fileName;
+  final String filePath;
+
+  /// A biblioteca de modelos aceita STL e 3MF (inclui `.gcode.3mf`).
+  bool get canSaveToLibrary => fileName.toLowerCase().endsWith('.3mf');
 
   String get productName => fileName
       .replaceAll(
         RegExp(r'\.(gcode\.3mf|3mf|gcode)$', caseSensitive: false),
         '',
       )
-      .replaceAll(RegExp(r'[_-]+'), ' ')
+      .replaceAll(RegExp('[_-]+'), ' ')
       .trim();
 }
 
@@ -57,7 +65,11 @@ Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
   if (!context.mounted || analysis.plates.isEmpty) return null;
 
   if (analysis.plates.length == 1) {
-    return SlicerImport(plates: analysis.plates, fileName: file.name);
+    return SlicerImport(
+      plates: analysis.plates,
+      fileName: file.name,
+      filePath: file.path,
+    );
   }
   final plates = await FormaDialog.show<List<SlicePlate>>(
     context,
@@ -69,7 +81,11 @@ Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
     child: _PlatePicker(analysis: analysis),
   );
   if (plates == null || plates.isEmpty) return null;
-  return SlicerImport(plates: plates, fileName: file.name);
+  return SlicerImport(
+    plates: plates,
+    fileName: file.name,
+    filePath: file.path,
+  );
 }
 
 /// Faz a análise dentro do diálogo e fecha com o resultado.
@@ -202,6 +218,9 @@ class _AnalyzeProgressState extends State<_AnalyzeProgress> {
   }
 }
 
+double _plateGrams(SlicePlate p) =>
+    p.filaments.fold<double>(0, (s, f) => s + f.grams);
+
 class _PlatePicker extends StatefulWidget {
   const _PlatePicker({required this.analysis});
 
@@ -236,7 +255,7 @@ class _PlatePickerState extends State<_PlatePicker> {
                     label: p.name.isEmpty ? 'Placa ${p.index}' : p.name,
                     description:
                         '${Fmt.duration(p.hours, p.minutes)} · '
-                        '${Fmt.grams(p.filaments.fold<double>(0, (s, f) => s + f.grams))}',
+                        '${Fmt.grams(_plateGrams(p))}',
                     onChanged: (v) => setState(
                       () => v
                           ? _selected.add(p.index)

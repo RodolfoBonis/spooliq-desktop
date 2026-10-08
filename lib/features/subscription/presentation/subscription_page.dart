@@ -120,8 +120,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                               '',
                           if (company?.trialDaysLeft != null)
                             '${company!.trialDaysLeft} dias restantes de teste',
-                          if (status?.nextDueDate != null)
-                            'próxima cobrança em ${Fmt.date(status!.nextDueDate)}',
+                          if (status?.nextDueDate != null) _nextCharge(status!),
                           if (status?.value != null) Fmt.money(status!.value),
                         ].where((s) => s.isNotEmpty).join(' · '),
                         style: typo.body13.copyWith(color: ext.textMuted),
@@ -266,7 +265,7 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
                                             ),
                                           ),
                                           Text(
-                                            'vencimento ${Fmt.date(p.dueDate)}${p.paymentDate == null ? '' : ' · pago em ${Fmt.date(p.paymentDate)}'}',
+                                            _paymentDates(p),
                                             style: typo.caption12.copyWith(
                                               color: ext.textMuted,
                                             ),
@@ -415,6 +414,8 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
           onChanged: (v) => setState(() => type = v ?? BillingType.creditCard),
         ),
         if (type == BillingType.creditCard)
+          // Cartão: oferecer cadastro quando não há cartão salvo.
+          // ignore: prefer_if_elements_to_conditional_expressions
           _methods.isEmpty
               ? Row(
                   children: [
@@ -486,6 +487,14 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
     if (mounted) unawaited(context.read<CurrentCompanyCubit>().load());
   }
 }
+
+String _nextCharge(SubscriptionInfo s) =>
+    'próxima cobrança em ${Fmt.date(s.nextDueDate)}';
+
+String _paymentDates(Payment p) => [
+  'vencimento ${Fmt.date(p.dueDate)}',
+  if (p.paymentDate != null) 'pago em ${Fmt.date(p.paymentDate)}',
+].join(' · ');
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({

@@ -16,7 +16,12 @@ class Mesh {
   /// Cor ARGB por triângulo (ex.: pintura multicolor do Bambu Studio).
   /// `null` = usar a cor padrão do visualizador.
   final Int32List? triangleColors;
-  late final double minX, minY, minZ, maxX, maxY, maxZ;
+  late final double minX;
+  late final double minY;
+  late final double minZ;
+  late final double maxX;
+  late final double maxY;
+  late final double maxZ;
 
   int get triangleCount => positions.length ~/ 9;
 
@@ -27,11 +32,17 @@ class Mesh {
       math.sqrt(sizeX * sizeX + sizeY * sizeY + sizeZ * sizeZ) / 2;
 
   void _computeBounds() {
-    var x0 = double.infinity, y0 = double.infinity, z0 = double.infinity;
-    var x1 = -double.infinity, y1 = -double.infinity, z1 = -double.infinity;
+    var x0 = double.infinity;
+    var y0 = double.infinity;
+    var z0 = double.infinity;
+    var x1 = -double.infinity;
+    var y1 = -double.infinity;
+    var z1 = -double.infinity;
     final p = positions;
     for (var i = 0; i < p.length; i += 3) {
-      final x = p[i], y = p[i + 1], z = p[i + 2];
+      final x = p[i];
+      final y = p[i + 1];
+      final z = p[i + 2];
       if (x < x0) x0 = x;
       if (y < y0) y0 = y;
       if (z < z0) z0 = z;
@@ -86,7 +97,9 @@ class Mesh {
     final keys = Int64List(n * 3);
     final p = positions;
     for (var v = 0; v < n * 3; v++) {
-      final x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2];
+      final x = p[v * 3];
+      final y = p[v * 3 + 1];
+      final z = p[v * 3 + 2];
       final k = key(x, y, z);
       keys[v] = k;
       final acc = sums.putIfAbsent(k, () => [0, 0, 0, 0]);
@@ -100,7 +113,9 @@ class Mesh {
     final outColors = <int>[];
     final seen = <String>{};
     for (var t = 0; t < n; t++) {
-      final a = keys[t * 3], b = keys[t * 3 + 1], c = keys[t * 3 + 2];
+      final a = keys[t * 3];
+      final b = keys[t * 3 + 1];
+      final c = keys[t * 3 + 2];
       if (a == b || b == c || a == c) continue;
       // Ordena para deduplicar o mesmo triângulo colapsado.
       final sorted = [a, b, c]..sort();
@@ -122,7 +137,8 @@ class Mesh {
 
   /// Centraliza em XY e apoia na mesa (z mínimo = 0).
   Mesh placedOnPlate() {
-    final cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    final cx = (minX + maxX) / 2;
+    final cy = (minY + maxY) / 2;
     final out = Float32List(positions.length);
     for (var i = 0; i < positions.length; i += 3) {
       out[i] = positions[i] - cx;
@@ -238,16 +254,16 @@ Mesh parse3mf(Uint8List bytes) {
     final meshStart = obj.indexOf('<mesh');
     if (meshStart >= 0) {
       final verts = <double>[];
-      var pos = obj.indexOf('<vertex', meshStart);
+      var pos = _nextTag(obj, 'vertex', meshStart);
       while (pos >= 0) {
         final end = obj.indexOf('>', pos);
         verts
           ..add(_attrNum(obj, pos, end, 'x'))
           ..add(_attrNum(obj, pos, end, 'y'))
           ..add(_attrNum(obj, pos, end, 'z'));
-        pos = obj.indexOf('<vertex', end);
+        pos = _nextTag(obj, 'vertex', end);
       }
-      pos = obj.indexOf('<triangle', meshStart);
+      pos = _nextTag(obj, 'triangle', meshStart);
       while (pos >= 0) {
         final end = obj.indexOf('>', pos);
         final a = _attrNum(obj, pos, end, 'v1').toInt() * 3;
@@ -257,7 +273,9 @@ Mesh parse3mf(Uint8List bytes) {
             b + 2 < verts.length &&
             c + 2 < verts.length) {
           for (final i in [a, b, c]) {
-            final x = verts[i], y = verts[i + 1], z = verts[i + 2];
+            final x = verts[i];
+            final y = verts[i + 1];
+            final z = verts[i + 2];
             out
               ..add(m[0] * x + m[3] * y + m[6] * z + m[9])
               ..add(m[1] * x + m[4] * y + m[7] * z + m[10])
@@ -274,17 +292,13 @@ Mesh parse3mf(Uint8List bytes) {
                 : 0,
           );
         }
-        pos = obj.indexOf('<triangle', end);
+        pos = _nextTag(obj, 'triangle', end);
       }
     }
 
-    var c = obj.indexOf('<component');
+    var c = _nextTag(obj, 'component', 0);
     while (c >= 0) {
       final end = obj.indexOf('>', c);
-      if (obj.startsWith('<components', c)) {
-        c = obj.indexOf('<component', end);
-        continue;
-      }
       final childPath =
           _attr(obj, c, end, 'p:path') ?? _attr(obj, c, end, 'path') ?? path;
       emitObject(
@@ -294,19 +308,19 @@ Mesh parse3mf(Uint8List bytes) {
         depth + 1,
         extruder,
       );
-      c = obj.indexOf('<component', end);
+      c = _nextTag(obj, 'component', end);
     }
   }
 
   final root = models[rootPath]!;
   final buildStart = root.indexOf('<build');
-  var item = buildStart < 0 ? -1 : root.indexOf('<item', buildStart);
+  var item = buildStart < 0 ? -1 : _nextTag(root, 'item', buildStart);
   if (item < 0) {
-    var o = root.indexOf('<object');
+    var o = _nextTag(root, 'object', 0);
     while (o >= 0) {
       final end = root.indexOf('>', o);
       emitObject(rootPath, _attr(root, o, end, 'id') ?? '', _identity, 0, 1);
-      o = root.indexOf('<object', end);
+      o = _nextTag(root, 'object', end);
     }
   }
   while (item >= 0) {
@@ -320,7 +334,7 @@ Mesh parse3mf(Uint8List bytes) {
       0,
       1,
     );
-    item = root.indexOf('<item', end);
+    item = _nextTag(root, 'item', end);
   }
 
   if (out.isEmpty) throw const MeshFormatException('O 3MF não contém malhas.');
@@ -334,16 +348,38 @@ Mesh parse3mf(Uint8List bytes) {
   );
 }
 
+/// Próxima tag `<name …>` exata a partir de [from] (ignora `<names>` etc.).
+int _nextTag(String s, String name, int from) {
+  final needle = '<$name';
+  var i = s.indexOf(needle, from < 0 ? 0 : from);
+  while (i >= 0) {
+    final after = i + needle.length;
+    if (after >= s.length) return -1;
+    final ch = s.codeUnitAt(after);
+    // espaço, tab, quebra de linha, '/' ou '>'
+    if (ch == 0x20 ||
+        ch == 0x09 ||
+        ch == 0x0A ||
+        ch == 0x0D ||
+        ch == 0x2F ||
+        ch == 0x3E) {
+      return i;
+    }
+    i = s.indexOf(needle, after);
+  }
+  return -1;
+}
+
 /// Recorta o elemento `<object id="…">…</object>` do XML.
 String? _findObject(String xml, String id) {
-  var pos = xml.indexOf('<object');
+  var pos = _nextTag(xml, 'object', 0);
   while (pos >= 0) {
     final end = xml.indexOf('>', pos);
     if (_attr(xml, pos, end, 'id') == id) {
       final close = xml.indexOf('</object>', end);
       return xml.substring(pos, close < 0 ? xml.length : close);
     }
-    pos = xml.indexOf('<object', end);
+    pos = _nextTag(xml, 'object', end);
   }
   return null;
 }

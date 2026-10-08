@@ -11,8 +11,8 @@ e a API SpoolIQ (`https://api.spooliq.com/v1`).
 ## Requisitos
 
 - Flutter 3.47.6 via [fvm](https://fvm.app) (`.fvmrc`)
-- Checkout do Forma ao lado deste repo (`../forma`, branch `feat/desktop-foundation`)
-  enquanto os pacotes desktop não forem publicados — veja `pubspec_overrides.yaml`
+- Token de leitura do pub privado do Forma:
+  `dart pub token add https://pub.rodolfodebonis.com.br` (no CI: secret `PUB_TOKEN`)
 - macOS: Xcode 16+. Windows: Visual Studio 2022 com "Desktop development with C++"
 
 ## Rodando
@@ -62,5 +62,5 @@ fvm flutter build windows --release -t lib/main_production.dart
 ```
 
 O CI (`.github/workflows/ci.yml`) roda analyze/test e gera os artefatos de macOS
-e Windows. Segredos: `FORMA_REPO_TOKEN`, `PUB_TOKEN`, `SENTRY_DSN`.
+e Windows. Segredos: `PUB_TOKEN` (pub privado) e `SENTRY_DSN` (opcional).
 Assinatura/notarização (macOS) e instalador MSIX (Windows) ainda não configurados.

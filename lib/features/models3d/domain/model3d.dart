@@ -19,6 +19,16 @@ class Model3D extends Equatable {
     this.createdAt,
   });
 
+  /// Referência mínima (id + nome) para abrir o visualizador quando só o
+  /// vínculo é conhecido (ex.: item de orçamento).
+  factory Model3D.ref(String id, String name) => Model3D(
+    id: id,
+    name: name,
+    fileName: '',
+    format: '',
+    sizeBytes: 0,
+  );
+
   factory Model3D.fromJson(Json json) {
     final j = json.unwrapData();
     return Model3D(

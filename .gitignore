@@ -20,3 +20,7 @@ macos/Flutter/ephemeral/
 
 # Windows
 windows/flutter/ephemeral/
+
+# Instaladores gerados
+dist/
+pubspec_overrides.yaml

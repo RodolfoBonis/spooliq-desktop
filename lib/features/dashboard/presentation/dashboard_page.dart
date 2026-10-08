@@ -32,7 +32,7 @@ const _materialColors = {
 /// Cor do material pelo nome ("PLA Premium" → PLA, "PETG HF" → PETG).
 Color? _materialColor(String name) {
   final upper = name.toUpperCase();
-  final words = upper.split(RegExp(r'[^A-Z0-9]+'));
+  final words = upper.split(RegExp('[^A-Z0-9]+'));
   for (final e in _materialColors.entries) {
     if (words.contains(e.key)) return e.value;
   }
@@ -95,7 +95,8 @@ class _DashboardView extends StatelessWidget {
     return PageLayout(
       title: '$greeting${name.isEmpty ? '' : ', $name'}',
       subtitle:
-          'Como está o seu negócio nos últimos ${state.period.label.toLowerCase()}.',
+          'Como está o seu negócio nos últimos '
+          '${state.period.label.toLowerCase()}.',
       actions: [_PeriodPicker(value: state.period, onChanged: cubit.load)],
       scrollable: true,
       body: LayoutBuilder(

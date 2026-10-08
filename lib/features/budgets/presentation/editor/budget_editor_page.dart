@@ -7,6 +7,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
+import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
@@ -18,6 +19,7 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/item_editor
 import 'package:spooliq_desktop/features/budgets/presentation/editor/preview_panel.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/editor/slicer_import.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
+import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 
 class SaveIntent extends Intent {
@@ -607,7 +609,45 @@ class _Form extends StatelessWidget {
       variant: unmatched == 0
           ? FormaToastVariant.success
           : FormaToastVariant.warning,
+      duration: const Duration(seconds: 8),
+      actionLabel: result.canSaveToLibrary ? 'Salvar na biblioteca' : null,
+      onAction: result.canSaveToLibrary
+          ? () => unawaited(_saveToLibrary(context, cubit, itemKey, result))
+          : null,
     );
+  }
+
+  /// Envia o arquivo do fatiador para a biblioteca e vincula ao item.
+  static Future<void> _saveToLibrary(
+    BuildContext context,
+    BudgetEditorCubit cubit,
+    int itemKey,
+    SlicerImport result,
+  ) async {
+    Toasts.info(context, 'Enviando para a biblioteca…');
+    try {
+      final model = await di<Model3DRepository>().upload(
+        filePath: result.filePath,
+        name: result.productName,
+        customerId: cubit.state.draft.customerId,
+      );
+      cubit.updateItem(
+        itemKey,
+        (i) => i.copyWith(
+          model3dId: () => model.id,
+          model3dName: () => model.name,
+        ),
+      );
+      if (context.mounted) {
+        Toasts.success(
+          context,
+          'Modelo salvo e vinculado',
+          description: model.name,
+        );
+      }
+    } on ApiError catch (e) {
+      if (context.mounted) Toasts.error(context, e);
+    }
   }
 
   static String _taxHelper(double? companyDefault) => companyDefault == null
