@@ -45,11 +45,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            cmd: flutter build macos --release --flavor production -t lib/main_production.dart
-            artifact: build/macos/Build/Products/Release-production
+            cmd: bash scripts/build_macos_dmg.sh
+            artifact: dist/*.dmg
           - os: windows-latest
-            cmd: flutter build windows --release -t lib/main_production.dart
-            artifact: build/windows/x64/runner/Release
+            cmd: flutter build windows --release -t lib/main_production.dart && iscc /DAppVersion=0.1.0 windows\installer.iss
+            artifact: dist/*.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
