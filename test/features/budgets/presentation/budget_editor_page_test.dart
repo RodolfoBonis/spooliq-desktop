@@ -24,10 +24,24 @@ import 'package:spooliq_desktop/features/company/domain/company_repository.dart'
 import 'package:spooliq_desktop/features/company/presentation/current_company_cubit.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/dashboard/domain/dashboard.dart';
+import 'package:spooliq_desktop/features/notifications/domain/notification.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 
 class _Budgets extends Mock implements BudgetRepository {}
+
+class _Notifications extends Mock implements NotificationRepository {
+  @override
+  Future<int> unreadCount() async => 0;
+
+  @override
+  Future<Paginated<AppNotification>> list({
+    PageQuery page = const PageQuery(),
+    bool unreadOnly = false,
+  }) async => const Paginated.empty();
+}
+
+class _Notifier extends Mock implements SystemNotifier {}
 
 class _Presets extends Mock implements PresetRepository {}
 
@@ -70,7 +84,9 @@ void main() {
       ..registerSingleton<CompanyRepository>(company)
       ..registerSingleton<CustomerRepository>(customers)
       ..registerSingleton<DashboardRepository>(_OfflineDashboard())
-      ..registerSingleton<NetworkStatus>(NetworkStatus());
+      ..registerSingleton<NetworkStatus>(NetworkStatus())
+      ..registerSingleton<NotificationRepository>(_Notifications())
+      ..registerSingleton<SystemNotifier>(_Notifier());
   });
 
   testWidgets('can type in the project name field', (tester) async {

@@ -19,6 +19,9 @@ import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/company/domain/company.dart';
 import 'package:spooliq_desktop/features/company/presentation/current_company_cubit.dart';
+import 'package:spooliq_desktop/features/notifications/presentation/notification_bell.dart';
+import 'package:spooliq_desktop/features/notifications/presentation/notifications_cubit.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Intents globais de teclado.
 class OpenCommandPaletteIntent extends Intent {
@@ -43,10 +46,32 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   bool _collapsed = false;
 
+  /// Só para quem tem área de organização (as rotas exigem org).
+  NotificationsCubit? _notifications;
+
   @override
   void initState() {
     super.initState();
     unawaited(context.read<CurrentCompanyCubit>().load());
+    final user = context.read<SessionCubit>().state.user;
+    if (user?.canSeeOrganizationArea ?? false) {
+      _notifications = NotificationsCubit(di(), di())
+        ..onOpen = _openFromSystemNotification
+        ..start();
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_notifications?.close());
+    super.dispose();
+  }
+
+  /// Clique na notificação nativa: traz a janela para frente e abre o link.
+  void _openFromSystemNotification(String link) {
+    unawaited(windowManager.show());
+    unawaited(windowManager.focus());
+    if (mounted) context.go(link);
   }
 
   void _openPalette() {
@@ -102,42 +127,52 @@ class _AppShellState extends State<AppShell> {
         },
         child: Focus(
           autofocus: true,
-          child: Scaffold(
-            body: Row(
-              children: [
-                _Sidebar(
-                  user: user,
-                  location: widget.location,
-                  collapsed: _collapsed,
-                  onToggle: () => setState(() => _collapsed = !_collapsed),
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _TopBar(
-                        location: widget.location,
-                        isMac: isMac,
-                        onSearch: _openPalette,
-                        onNewBudget: user.canSeeOrganizationArea
-                            ? _newBudget
-                            : null,
-                      ),
-                      const UpdateBanner(),
-                      OfflineBanner(
-                        status: di(),
-                        ping: () => di<ApiClient>().ping(),
-                      ),
-                      const SubscriptionBanner(),
-                      Expanded(child: widget.child),
-                    ],
+          child: _withNotifications(
+            Scaffold(
+              body: Row(
+                children: [
+                  _Sidebar(
+                    user: user,
+                    location: widget.location,
+                    collapsed: _collapsed,
+                    onToggle: () => setState(() => _collapsed = !_collapsed),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _TopBar(
+                          location: widget.location,
+                          isMac: isMac,
+                          onSearch: _openPalette,
+                          onNewBudget: user.canSeeOrganizationArea
+                              ? _newBudget
+                              : null,
+                          showNotifications: _notifications != null,
+                        ),
+                        const UpdateBanner(),
+                        OfflineBanner(
+                          status: di(),
+                          ping: () => di<ApiClient>().ping(),
+                        ),
+                        const SubscriptionBanner(),
+                        Expanded(child: widget.child),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _withNotifications(Widget child) {
+    final cubit = _notifications;
+    return cubit == null
+        ? child
+        : BlocProvider.value(value: cubit, child: child);
   }
 }
 
@@ -300,12 +335,14 @@ class _TopBar extends StatelessWidget {
     required this.isMac,
     required this.onSearch,
     required this.onNewBudget,
+    required this.showNotifications,
   });
 
   final String location;
   final bool isMac;
   final VoidCallback onSearch;
   final VoidCallback? onNewBudget;
+  final bool showNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +354,10 @@ class _TopBar extends StatelessWidget {
         shortcut: isMac ? '⌘K' : 'Ctrl K',
       ),
       actions: [
+        if (showNotifications) ...[
+          const NotificationBell(),
+          const SizedBox(width: 4),
+        ],
         Tooltip(
           message: brightness == Brightness.dark ? 'Tema claro' : 'Tema escuro',
           child: FormaIconButton(
