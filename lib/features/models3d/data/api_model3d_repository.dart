@@ -47,6 +47,28 @@ class ApiModel3DRepository implements Model3DRepository {
   );
 
   @override
+  Future<Model3D> update(
+    String id, {
+    required String name,
+    required String? customerId,
+    String? description,
+    String? notes,
+    String? tags,
+  }) async => Model3D.fromJson(
+    await _api.putJson(
+      '/models3d/$id',
+      body: {
+        'name': name.trim(),
+        'description': description?.trim() ?? '',
+        'notes': notes?.trim() ?? '',
+        'tags': tags?.trim() ?? '',
+        // Sempre enviado: null explícito desvincula o cliente na API.
+        'customer_id': customerId,
+      },
+    ),
+  );
+
+  @override
   Future<void> delete(String id) => _api.delete('/models3d/$id');
 
   @override

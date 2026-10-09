@@ -168,6 +168,11 @@ class _ModelsView extends StatelessWidget {
               onTap: () => unawaited(_details(context, m)),
             ),
             FormaMenuItem(
+              label: 'Editar informações',
+              icon: Icons.edit_outlined,
+              onTap: () => unawaited(_edit(context, m)),
+            ),
+            FormaMenuItem(
               label: 'Baixar arquivo',
               icon: Icons.download_rounded,
               onTap: () => unawaited(_download(context, m)),
@@ -284,6 +289,85 @@ class _ModelsView extends StatelessWidget {
     if (saved == null || !context.mounted) return;
     cubit.upsert(saved);
     Toasts.success(context, 'Modelo enviado', description: saved.name);
+  }
+
+  Future<void> _edit(BuildContext context, Model3D m) async {
+    final cubit = context.read<PagedListCubit<Model3D>>();
+    final name = TextEditingController(text: m.name);
+    final description = TextEditingController(text: m.description);
+    final notes = TextEditingController(text: m.notes);
+    final tags = TextEditingController(text: m.tags.join(', '));
+    FormaSelectOption<String>? customer;
+    if (m.customerId != null) {
+      // A API devolve só o id do cliente; busca o nome para o combobox.
+      var label = 'Cliente vinculado';
+      try {
+        label = (await di<CustomerRepository>().get(m.customerId!)).name;
+      } on ApiError {
+        // Mantém o rótulo genérico; o vínculo continua sendo editável.
+      }
+      customer = FormaSelectOption(value: m.customerId!, label: label);
+    }
+    if (!context.mounted) return;
+
+    final saved = await showFormDialog<Model3D>(
+      context,
+      title: 'Editar modelo',
+      description: m.fileName,
+      fields: (setState) => [
+        FormaTextField(
+          label: 'Nome',
+          controller: name,
+          autofocus: true,
+          validator: requiredValidator,
+        ),
+        FormaCombobox<String>(
+          label: 'Cliente (opcional)',
+          value: customer,
+          search: (q) async {
+            final page = await di<CustomerRepository>().list(
+              page: PageQuery(pageSize: 8, search: q.isEmpty ? null : q),
+            );
+            return [
+              for (final c in page.items)
+                FormaSelectOption(value: c.id, label: c.name),
+            ];
+          },
+          onChanged: (v) => setState(() => customer = v),
+        ),
+        if (customer != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => customer = null),
+              icon: const Icon(Icons.link_off_rounded, size: 16),
+              label: const Text('Remover cliente'),
+            ),
+          ),
+        FormaTextField(
+          label: 'Descrição',
+          controller: description,
+          maxLines: 2,
+        ),
+        FormaTextField(
+          label: 'Tags',
+          hint: 'separadas por vírgula',
+          controller: tags,
+        ),
+        FormaTextField(label: 'Notas', controller: notes, maxLines: 2),
+      ],
+      onSubmit: () => di<Model3DRepository>().update(
+        m.id,
+        name: name.text,
+        customerId: customer?.value,
+        description: description.text,
+        notes: notes.text,
+        tags: tags.text,
+      ),
+    );
+    if (saved == null || !context.mounted) return;
+    cubit.upsert(saved);
+    Toasts.success(context, 'Modelo atualizado', description: saved.name);
   }
 
   Future<void> _download(BuildContext context, Model3D m) async {

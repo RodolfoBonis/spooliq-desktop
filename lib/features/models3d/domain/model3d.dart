@@ -74,7 +74,16 @@ class Model3D extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, fileName, sizeBytes];
+  List<Object?> get props => [
+    id,
+    name,
+    fileName,
+    sizeBytes,
+    description,
+    customerId,
+    notes,
+    tags,
+  ];
 }
 
 /// Filamento detectado pelo fatiador num slot do AMS.
@@ -187,6 +196,16 @@ abstract interface class Model3DRepository {
     String? notes,
     String? tags,
     void Function(int sent, int total)? onProgress,
+  });
+
+  /// Atualiza os metadados. `customerId` nulo desvincula o cliente.
+  Future<Model3D> update(
+    String id, {
+    required String name,
+    required String? customerId,
+    String? description,
+    String? notes,
+    String? tags,
   });
   Future<void> delete(String id);
   Future<Uint8List> download(String id);
