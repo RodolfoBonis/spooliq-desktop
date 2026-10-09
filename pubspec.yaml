@@ -1,7 +1,7 @@
 name: spooliq_desktop
 description: SpoolIQ Desktop — gestão completa de orçamentos de impressão 3D para macOS e Windows.
 publish_to: none
-version: 0.1.1+2
+version: 0.2.0+3
 
 environment:
   sdk: ^3.11.0
