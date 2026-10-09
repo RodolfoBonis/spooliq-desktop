@@ -14,6 +14,7 @@ import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/company/domain/company.dart';
 import 'package:spooliq_desktop/features/company/presentation/current_company_cubit.dart';
 import 'package:spooliq_desktop/features/subscription/domain/billing.dart';
+import 'package:spooliq_desktop/features/subscription/presentation/cancel_subscription_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SubscriptionPage extends StatefulWidget {
@@ -473,18 +474,14 @@ class _SubscriptionPageState extends State<SubscriptionPage> {
   }
 
   Future<void> _cancel() async {
-    final ok = await FormaConfirmDialog.show(
+    final cancelled = await showCancelSubscriptionDialog(
       context,
-      title: 'Cancelar assinatura?',
-      message:
-          'Você perderá o acesso às funcionalidades ao fim do período pago.',
-      confirmLabel: 'Cancelar assinatura',
-      cancelLabel: 'Manter',
-      destructive: true,
+      repository: _repo,
     );
-    if (!ok) return;
-    await _run('Assinatura cancelada', _repo.cancel);
-    if (mounted) unawaited(context.read<CurrentCompanyCubit>().load());
+    if (!cancelled || !mounted) return;
+    Toasts.success(context, 'Assinatura cancelada');
+    unawaited(context.read<CurrentCompanyCubit>().load());
+    await _load();
   }
 }
 

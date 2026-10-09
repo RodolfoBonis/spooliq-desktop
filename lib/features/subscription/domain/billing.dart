@@ -237,6 +237,8 @@ abstract interface class BillingRepository {
     required BillingType type,
     String? paymentMethodId,
   });
-  Future<void> cancel();
+
+  /// [reason] usa os valores de `CancelReason`; [feedback] é texto livre.
+  Future<void> cancel({required String reason, String? feedback});
   Future<List<Payment>> payments();
 }

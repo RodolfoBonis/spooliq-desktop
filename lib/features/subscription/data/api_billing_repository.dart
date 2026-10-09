@@ -69,7 +69,16 @@ class ApiBillingRepository implements BillingRepository {
   );
 
   @override
-  Future<void> cancel() => _api.delete('/subscriptions/cancel');
+  Future<void> cancel({required String reason, String? feedback}) =>
+      _api.delete(
+        '/subscriptions/cancel',
+        body: compactJson({
+          'reason': reason,
+          'feedback': (feedback == null || feedback.trim().isEmpty)
+              ? null
+              : feedback.trim(),
+        }),
+      );
 
   @override
   Future<List<Payment>> payments() async => looseList(
