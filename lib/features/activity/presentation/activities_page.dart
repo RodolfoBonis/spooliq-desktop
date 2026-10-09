@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
-import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/core/ui/paged_table.dart';
@@ -53,13 +52,8 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
       unawaited(_cubit.load(_cubit.state.query.copyWith(page: 1)));
 
   void _open(Activity a) {
-    if (a.action == 'deleted') return;
-    switch (a.entityType) {
-      case 'budget':
-        context.go(Routes.budget(a.entityId));
-      case 'customer':
-        context.go(Routes.customer(a.entityId));
-    }
+    final route = ActivityTile.routeFor(a);
+    if (route != null) context.go(route);
   }
 
   @override

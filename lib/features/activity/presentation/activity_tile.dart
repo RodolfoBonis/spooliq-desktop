@@ -15,6 +15,16 @@ class ActivityTile extends StatelessWidget {
   /// Data/hora completa em vez de "há 2 h" (útil na página do log).
   final bool absoluteTime;
 
+  /// Rota da entidade, ou null quando não há tela (ou foi excluída).
+  static String? routeFor(Activity a) {
+    if (a.action == 'deleted') return null;
+    return switch (a.entityType) {
+      'budget' => Routes.budget(a.entityId),
+      'customer' => Routes.customer(a.entityId),
+      _ => null,
+    };
+  }
+
   static String verb(String action) => switch (action) {
     'created' => 'criou',
     'updated' => 'atualizou',
@@ -50,14 +60,8 @@ class ActivityTile extends StatelessWidget {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     final a = activity;
-    // Excluídos não têm para onde navegar.
-    final onTap = a.action == 'deleted'
-        ? null
-        : switch (a.entityType) {
-            'budget' => () => context.go(Routes.budget(a.entityId)),
-            'customer' => () => context.go(Routes.customer(a.entityId)),
-            _ => null,
-          };
+    final route = routeFor(a);
+    final onTap = route == null ? null : () => context.go(route);
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
