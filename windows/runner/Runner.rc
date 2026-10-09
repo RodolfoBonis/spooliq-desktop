@@ -94,7 +94,7 @@ BEGIN
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "SpoolIQ" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 Loopcraft. Todos os direitos reservados." "\0"
-            VALUE "OriginalFilename", "spooliq_desktop.exe" "\0"
+            VALUE "OriginalFilename", "SpoolIQ.exe" "\0"
             VALUE "ProductName", "SpoolIQ" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
