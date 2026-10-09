@@ -172,4 +172,49 @@ class ApiAdminRepository implements AdminRepository {
           '/admin/subscription-plans/migrations/$migrationId/execute',
         ),
       );
+
+  @override
+  Future<PlanMigration> migration(String migrationId) async =>
+      PlanMigration.fromJson(
+        await _api.getJson(
+          '/admin/subscription-plans/migrations/$migrationId',
+        ),
+      );
+
+  @override
+  Future<List<AvailableFeature>> availableFeatures() async => looseList(
+    await _api.get('/admin/features/available', query: {'page_size': 100}),
+    AvailableFeature.fromJson,
+    'features',
+  );
+
+  @override
+  Future<FeatureValidation> validateFeatures(
+    List<PlanFeature> features,
+  ) async => FeatureValidation.fromJson(
+    await _api.postJson(
+      '/admin/features/validate',
+      body: {
+        'features': [for (final f in features) f.toJson()],
+      },
+    ),
+  );
+
+  @override
+  Future<Paginated<PlanAuditEntry>> planHistory(
+    String id, {
+    int page = 1,
+  }) async => Paginated.fromJson(
+    await _api.get(
+      '/admin/subscription-plans/$id/history',
+      query: {'page': page, 'page_size': 20},
+    ),
+    PlanAuditEntry.fromJson,
+  );
+
+  @override
+  Future<SubscriptionDetail> subscriptionDetail(String organizationId) async =>
+      SubscriptionDetail.fromJson(
+        await _api.getJson('/admin/subscriptions/$organizationId'),
+      );
 }

@@ -241,6 +241,10 @@ class PlanMigration extends Equatable {
     required this.failed,
     this.fromPlan,
     this.toPlan,
+    this.summary,
+    this.scheduledFor,
+    this.completedAt,
+    this.results = const [],
   });
 
   factory PlanMigration.fromJson(Json json) {
@@ -253,6 +257,10 @@ class PlanMigration extends Equatable {
       failed: j.integer('failed'),
       fromPlan: j.strOrNull('from_plan_name'),
       toPlan: j.strOrNull('to_plan_name'),
+      summary: j.strOrNull('summary'),
+      scheduledFor: j.date('scheduled_for'),
+      completedAt: j.date('completed_at'),
+      results: j.list('results', MigrationCompanyResult.fromJson),
     );
   }
 
@@ -263,6 +271,14 @@ class PlanMigration extends Equatable {
   final int failed;
   final String? fromPlan;
   final String? toPlan;
+  final String? summary;
+  final DateTime? scheduledFor;
+  final DateTime? completedAt;
+
+  /// Resultado por empresa (preenchido após a execução).
+  final List<MigrationCompanyResult> results;
+
+  bool get canExecute => status == 'scheduled';
 
   String get statusLabel => switch (status) {
     'scheduled' => 'Agendada',
@@ -273,7 +289,161 @@ class PlanMigration extends Equatable {
   };
 
   @override
-  List<Object?> get props => [id, status, successful, failed];
+  List<Object?> get props => [id, status, successful, failed, results];
+}
+
+class MigrationCompanyResult extends Equatable {
+  const MigrationCompanyResult({
+    required this.companyName,
+    required this.success,
+    this.error,
+  });
+
+  factory MigrationCompanyResult.fromJson(Json j) => MigrationCompanyResult(
+    companyName: j.str('company_name'),
+    success: j.boolean('success'),
+    error: j.strOrNull('error'),
+  );
+
+  final String companyName;
+  final bool success;
+  final String? error;
+
+  @override
+  List<Object?> get props => [companyName, success, error];
+}
+
+/// Recurso do catálogo da plataforma, usado nos planos.
+class AvailableFeature extends Equatable {
+  const AvailableFeature({
+    required this.name,
+    this.description,
+    this.category,
+    this.isActive = true,
+  });
+
+  factory AvailableFeature.fromJson(Json j) => AvailableFeature(
+    name: j.str('name'),
+    description: j.strOrNull('description'),
+    category: j.strOrNull('category'),
+    isActive: j.boolean('is_active', fallback: true),
+  );
+
+  final String name;
+  final String? description;
+  final String? category;
+  final bool isActive;
+
+  PlanFeature toPlanFeature() =>
+      PlanFeature(name: name, description: description);
+
+  @override
+  List<Object?> get props => [name, category, isActive];
+}
+
+/// Resultado de `POST /admin/features/validate`.
+class FeatureValidation extends Equatable {
+  const FeatureValidation({
+    required this.isValid,
+    this.invalid = const [],
+    this.suggestions = const [],
+  });
+
+  factory FeatureValidation.fromJson(Json json) {
+    final j = json.unwrapData();
+    return FeatureValidation(
+      isValid: j.boolean('is_valid'),
+      invalid: j.list('invalid_features', _invalidLabel),
+      suggestions: j.strings('suggestions'),
+    );
+  }
+
+  static String _invalidLabel(Json e) {
+    final name = e.obj('feature')?.strOrNull('name') ?? '?';
+    return '$name: ${e.strOrNull('error') ?? 'inválido'}';
+  }
+
+  final bool isValid;
+
+  /// "nome: erro" para cada recurso rejeitado.
+  final List<String> invalid;
+  final List<String> suggestions;
+
+  @override
+  List<Object?> get props => [isValid, invalid, suggestions];
+}
+
+/// Entrada do histórico de alterações de um plano.
+class PlanAuditEntry extends Equatable {
+  const PlanAuditEntry({
+    required this.id,
+    required this.action,
+    this.userEmail,
+    this.reason,
+    this.changedFields = const [],
+    this.createdAt,
+  });
+
+  factory PlanAuditEntry.fromJson(Json j) => PlanAuditEntry(
+    id: j.str('id'),
+    action: j.str('action'),
+    userEmail: j.strOrNull('user_email'),
+    reason: j.strOrNull('reason'),
+    changedFields: (j.obj('changes')?.keys.toList() ?? const <String>[])
+      ..sort(),
+    createdAt: j.date('created_at'),
+  );
+
+  final String id;
+
+  /// created, updated, deleted, activated, deactivated (e migrações).
+  final String action;
+  final String? userEmail;
+  final String? reason;
+  final List<String> changedFields;
+  final DateTime? createdAt;
+
+  String get actionLabel => switch (action) {
+    'created' => 'Criado',
+    'updated' => 'Atualizado',
+    'deleted' => 'Excluído',
+    'activated' => 'Ativado',
+    'deactivated' => 'Desativado',
+    'migrated' || 'migration' => 'Migração',
+    _ => action,
+  };
+
+  @override
+  List<Object?> get props => [id, action, createdAt];
+}
+
+/// Dados de cobrança de `GET /admin/subscriptions/{org}`.
+class SubscriptionDetail extends Equatable {
+  const SubscriptionDetail({
+    this.planName,
+    this.planPrice,
+    this.planCycle,
+    this.statusUpdatedAt,
+  });
+
+  factory SubscriptionDetail.fromJson(Json json) {
+    final j = json.unwrapData();
+    final plan = j.obj('current_plan');
+    return SubscriptionDetail(
+      planName: plan?.strOrNull('name'),
+      planPrice: plan?.dblOrNull('price'),
+      planCycle: plan?.strOrNull('cycle'),
+      statusUpdatedAt: j.date('status_updated_at'),
+    );
+  }
+
+  final String? planName;
+  final double? planPrice;
+  final String? planCycle;
+  final DateTime? statusUpdatedAt;
+
+  @override
+  List<Object?> get props => [planName, planPrice, planCycle, statusUpdatedAt];
 }
 
 abstract interface class AdminRepository {
@@ -314,4 +484,9 @@ abstract interface class AdminRepository {
     DateTime? scheduledFor,
   });
   Future<PlanMigration> executeMigration(String migrationId);
+  Future<PlanMigration> migration(String migrationId);
+  Future<List<AvailableFeature>> availableFeatures();
+  Future<FeatureValidation> validateFeatures(List<PlanFeature> features);
+  Future<Paginated<PlanAuditEntry>> planHistory(String id, {int page = 1});
+  Future<SubscriptionDetail> subscriptionDetail(String organizationId);
 }
