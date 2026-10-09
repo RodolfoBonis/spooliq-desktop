@@ -10,16 +10,14 @@ import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
-import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
-import 'package:spooliq_desktop/core/ui/form_dialog.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/core/ui/paged_table.dart';
 import 'package:spooliq_desktop/core/ui/search_field.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
-import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/models3d/presentation/model_dialogs.dart';
 import 'package:spooliq_desktop/features/models3d/presentation/slice_analysis_view.dart';
 import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
 
@@ -221,163 +219,14 @@ class _ModelsView extends StatelessWidget {
 
   Future<void> _upload(BuildContext context) async {
     final cubit = context.read<PagedListCubit<Model3D>>();
-    final file = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Modelos 3D', extensions: ['stl', '3mf']),
-      ],
-    );
-    if (file == null || !context.mounted) return;
-    final name = TextEditingController(
-      text: file.name.replaceAll(
-        RegExp(r'\.(stl|3mf)$', caseSensitive: false),
-        '',
-      ),
-    );
-    final description = TextEditingController();
-    final notes = TextEditingController();
-    final tags = TextEditingController();
-    FormaSelectOption<String>? customer;
-    const progress = 0.0;
-
-    final saved = await showFormDialog<Model3D>(
-      context,
-      title: 'Enviar modelo',
-      description: file.name,
-      submitLabel: 'Enviar',
-      fields: (setState) => [
-        FormaTextField(
-          label: 'Nome',
-          controller: name,
-          autofocus: true,
-          validator: requiredValidator,
-        ),
-        FormaCombobox<String>(
-          label: 'Cliente (opcional)',
-          value: customer,
-          search: (q) async {
-            final page = await di<CustomerRepository>().list(
-              page: PageQuery(pageSize: 8, search: q.isEmpty ? null : q),
-            );
-            return [
-              for (final c in page.items)
-                FormaSelectOption(value: c.id, label: c.name),
-            ];
-          },
-          onChanged: (v) => setState(() => customer = v),
-        ),
-        FormaTextField(
-          label: 'Descrição',
-          controller: description,
-          maxLines: 2,
-        ),
-        FormaTextField(
-          label: 'Tags',
-          hint: 'separadas por vírgula',
-          controller: tags,
-        ),
-        FormaTextField(label: 'Notas', controller: notes, maxLines: 2),
-        if (progress > 0) const LinearProgressIndicator(value: progress),
-      ],
-      onSubmit: () => di<Model3DRepository>().upload(
-        filePath: file.path,
-        name: name.text,
-        description: description.text,
-        customerId: customer?.value,
-        notes: notes.text,
-        tags: tags.text,
-      ),
-    );
-    if (saved == null || !context.mounted) return;
-    cubit.upsert(saved);
-    Toasts.success(context, 'Modelo enviado', description: saved.name);
+    final saved = await showUploadModelDialog(context);
+    if (saved != null) cubit.upsert(saved);
   }
 
   Future<void> _edit(BuildContext context, Model3D m) async {
     final cubit = context.read<PagedListCubit<Model3D>>();
-    final name = TextEditingController(text: m.name);
-    final description = TextEditingController(text: m.description);
-    final notes = TextEditingController(text: m.notes);
-    final tags = TextEditingController(text: m.tags.join(', '));
-    FormaSelectOption<String>? customer;
-    if (m.customerId != null) {
-      // A API devolve só o id do cliente; busca o nome para o combobox.
-      var label = 'Cliente vinculado';
-      try {
-        label = (await di<CustomerRepository>().get(m.customerId!)).name;
-      } on ApiError {
-        // Mantém o rótulo genérico; o vínculo continua sendo editável.
-      } on Object catch (e, st) {
-        unawaited(
-          AppLogger.error(
-            e,
-            st,
-            reason: 'model_customer',
-            category: 'models3d',
-          ),
-        );
-      }
-      customer = FormaSelectOption(value: m.customerId!, label: label);
-    }
-    if (!context.mounted) return;
-
-    final saved = await showFormDialog<Model3D>(
-      context,
-      title: 'Editar modelo',
-      description: m.fileName,
-      fields: (setState) => [
-        FormaTextField(
-          label: 'Nome',
-          controller: name,
-          autofocus: true,
-          validator: requiredValidator,
-        ),
-        FormaCombobox<String>(
-          label: 'Cliente (opcional)',
-          value: customer,
-          search: (q) async {
-            final page = await di<CustomerRepository>().list(
-              page: PageQuery(pageSize: 8, search: q.isEmpty ? null : q),
-            );
-            return [
-              for (final c in page.items)
-                FormaSelectOption(value: c.id, label: c.name),
-            ];
-          },
-          onChanged: (v) => setState(() => customer = v),
-        ),
-        if (customer != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => customer = null),
-              icon: const Icon(Icons.link_off_rounded, size: 16),
-              label: const Text('Remover cliente'),
-            ),
-          ),
-        FormaTextField(
-          label: 'Descrição',
-          controller: description,
-          maxLines: 2,
-        ),
-        FormaTextField(
-          label: 'Tags',
-          hint: 'separadas por vírgula',
-          controller: tags,
-        ),
-        FormaTextField(label: 'Notas', controller: notes, maxLines: 2),
-      ],
-      onSubmit: () => di<Model3DRepository>().update(
-        m.id,
-        name: name.text,
-        customerId: customer?.value,
-        description: description.text,
-        notes: notes.text,
-        tags: tags.text,
-      ),
-    );
-    if (saved == null || !context.mounted) return;
-    cubit.upsert(saved);
-    Toasts.success(context, 'Modelo atualizado', description: saved.name);
+    final saved = await showEditModelDialog(context, m);
+    if (saved != null) cubit.upsert(saved);
   }
 
   Future<void> _download(BuildContext context, Model3D m) async {

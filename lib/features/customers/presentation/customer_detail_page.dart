@@ -5,10 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/auth/permissions.dart';
+import 'package:spooliq_desktop/core/auth/session_user.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
@@ -16,10 +18,14 @@ import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
+import 'package:spooliq_desktop/features/budgets/presentation/budget_actions.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_status_badge.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/customers/presentation/customer_form.dart';
+import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/models3d/presentation/model_dialogs.dart';
+import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   const CustomerDetailPage({required this.id, super.key});
@@ -33,6 +39,7 @@ class CustomerDetailPage extends StatefulWidget {
 class _CustomerDetailPageState extends State<CustomerDetailPage> {
   Customer? _customer;
   List<Budget> _budgets = const [];
+  List<Model3D> _models = const [];
   String? _error;
 
   @override
@@ -44,18 +51,66 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final customer = await di<CustomerRepository>().get(widget.id);
-      final budgets = await di<BudgetRepository>().list(
+      final customerFuture = di<CustomerRepository>().get(widget.id);
+      final budgetsFuture = di<BudgetRepository>().list(
         filter: BudgetFilter(customerId: widget.id),
         page: const PageQuery(pageSize: 100, sortBy: 'created_at'),
       );
+      final modelsFuture = di<Model3DRepository>().list(
+        customerId: widget.id,
+        page: const PageQuery(pageSize: 100, sortBy: 'created_at'),
+      );
+      // Future.wait escuta as três (nenhum erro fica sem tratamento) e
+      // relança o primeiro; depois disso os awaits abaixo já resolveram.
+      await Future.wait([customerFuture, budgetsFuture, modelsFuture]);
+      final customer = await customerFuture;
+      final budgets = await budgetsFuture;
+      final models = await modelsFuture;
       if (!mounted) return;
       setState(() {
         _customer = customer;
         _budgets = budgets.items;
+        _models = models.items;
       });
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
+    } on Object catch (e, st) {
+      unawaited(
+        AppLogger.error(
+          e,
+          st,
+          reason: 'customer_detail',
+          category: 'customers',
+        ),
+      );
+      if (mounted) {
+        setState(() => _error = 'Não foi possível carregar o cliente.');
+      }
+    }
+  }
+
+  void _replaceBudget(Budget b) =>
+      setState(() => _budgets = _upsertById(_budgets, b, (x) => x.id));
+
+  void _replaceModel(Model3D m) =>
+      setState(() => _models = _upsertById(_models, m, (x) => x.id));
+
+  Future<void> _uploadModel(Customer c) async {
+    final saved = await showUploadModelDialog(
+      context,
+      customer: FormaSelectOption(value: c.id, label: c.name),
+    );
+    if (saved != null && mounted) _replaceModel(saved);
+  }
+
+  Future<void> _editModel(Model3D m) async {
+    final saved = await showEditModelDialog(context, m);
+    if (saved == null || !mounted) return;
+    if (saved.customerId == widget.id) {
+      _replaceModel(saved);
+    } else {
+      // Foi vinculado a outro cliente (ou desvinculado): sai desta lista.
+      setState(() => _models = _models.where((x) => x.id != m.id).toList());
     }
   }
 
@@ -69,8 +124,19 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     }
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    final canDelete = context.select<SessionCubit, bool>(
-      (s) => s.state.user?.canDeleteCustomers ?? false,
+    final user = context.select<SessionCubit, SessionUser?>(
+      (s) => s.state.user,
+    );
+    // Rebuild transitório durante o logout.
+    if (user == null) return const SizedBox.shrink();
+    final canDelete = user.canDeleteCustomers;
+    final actions = BudgetActions(
+      context: context,
+      user: user,
+      onChanged: _replaceBudget,
+      onDeleted: (id) => setState(
+        () => _budgets = _budgets.where((b) => b.id != id).toList(),
+      ),
     );
     final won = _budgets.where(
       (b) =>
@@ -281,6 +347,10 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                                           ),
                                         ),
                                       ),
+                                      FormaMenuButton(
+                                        tooltip: 'Ações',
+                                        items: actions.menuFor(b),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -291,8 +361,158 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          _ModelsSection(
+            models: _models,
+            onUpload: () => unawaited(_uploadModel(c)),
+            onEdit: (m) => unawaited(_editModel(m)),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Substitui o item com o mesmo id, ou insere no topo.
+List<T> _upsertById<T>(List<T> list, T item, String Function(T) idOf) {
+  final i = list.indexWhere((x) => idOf(x) == idOf(item));
+  return i < 0
+      ? [item, ...list]
+      : [...list.sublist(0, i), item, ...list.sublist(i + 1)];
+}
+
+class _ModelsSection extends StatelessWidget {
+  const _ModelsSection({
+    required this.models,
+    required this.onUpload,
+    required this.onEdit,
+  });
+
+  final List<Model3D> models;
+  final VoidCallback onUpload;
+  final ValueChanged<Model3D> onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    return SectionCard(
+      title: 'Modelos 3D',
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      trailing: models.isEmpty
+          ? null
+          : FormaButton.secondary(
+              label: 'Enviar modelo',
+              small: true,
+              icon: const Icon(Icons.upload_rounded, size: 16),
+              onPressed: onUpload,
+            ),
+      child: models.isEmpty
+          ? FormaEmptyState(
+              compact: true,
+              icon: Icons.view_in_ar_outlined,
+              title: 'Nenhum modelo deste cliente',
+              action: FormaButton.primary(
+                label: 'Enviar modelo',
+                small: true,
+                onPressed: onUpload,
+              ),
+            )
+          : Column(
+              children: [
+                for (final m in models)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => unawaited(showModelViewerDialog(context, m)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 6,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.view_in_ar_outlined,
+                            size: 18,
+                            color: ext.textHint,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  m.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: typo.body14Medium.copyWith(
+                                    color: ext.textPrimary,
+                                  ),
+                                ),
+                                if (m.tags.isNotEmpty)
+                                  Text(
+                                    m.tags.join(', '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: typo.caption12.copyWith(
+                                      color: ext.textMuted,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 56,
+                            child: Text(
+                              m.format,
+                              style: typo.caption12.copyWith(
+                                color: ext.textHint,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              m.sizeLabel,
+                              textAlign: TextAlign.right,
+                              style: typo.caption12.copyWith(
+                                color: ext.textMuted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          SizedBox(
+                            width: 84,
+                            child: Text(
+                              Fmt.date(m.createdAt),
+                              style: typo.caption12.copyWith(
+                                color: ext.textMuted,
+                              ),
+                            ),
+                          ),
+                          FormaMenuButton(
+                            tooltip: 'Ações',
+                            items: [
+                              FormaMenuItem(
+                                label: 'Visualizar em 3D',
+                                icon: Icons.threed_rotation_rounded,
+                                onTap: () => unawaited(
+                                  showModelViewerDialog(context, m),
+                                ),
+                              ),
+                              FormaMenuItem(
+                                label: 'Editar informações',
+                                icon: Icons.edit_outlined,
+                                onTap: () => onEdit(m),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 }
