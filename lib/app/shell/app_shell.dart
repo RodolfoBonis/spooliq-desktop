@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spooliq_desktop/app/shell/app_menu_bar.dart';
 import 'package:spooliq_desktop/app/shell/command_palette.dart';
 import 'package:spooliq_desktop/app/shell/offline_banner.dart';
 import 'package:spooliq_desktop/app/shell/subscription_banner.dart';
@@ -68,6 +69,16 @@ class _AppShellState extends State<AppShell> {
     final isMac = Theme.of(context).platform == TargetPlatform.macOS;
     final meta = isMac ? LogicalKeyboardKey.meta : LogicalKeyboardKey.control;
 
+    return AppMenuBar(
+      user: user,
+      onSearch: _openPalette,
+      child: _shortcuts(meta),
+    );
+  }
+
+  Widget _shortcuts(LogicalKeyboardKey meta) {
+    final user = context.read<SessionCubit>().state.user!;
+    final isMac = Theme.of(context).platform == TargetPlatform.macOS;
     return Shortcuts(
       shortcuts: {
         LogicalKeySet(meta, LogicalKeyboardKey.keyK):
