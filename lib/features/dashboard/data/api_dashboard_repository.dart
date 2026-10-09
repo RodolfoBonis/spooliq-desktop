@@ -26,36 +26,6 @@ class ApiDashboardRepository implements DashboardRepository {
       (await _get('conversion-funnel', p)).list('steps', FunnelStep.fromJson);
 
   @override
-  Future<List<RankedItem>> topCustomers(DashboardPeriod p) async =>
-      (await _get('top-customers', p, limit: 5)).list(
-        'customers',
-        (j) => RankedItem(
-          id: j.str('id'),
-          name: j.str('name'),
-          subtitle: j.strOrNull('email'),
-          value: j.integer('total_revenue'),
-          count: j.integer('budget_count'),
-        ),
-      );
-
-  @override
-  Future<List<RankedItem>> topFilaments(DashboardPeriod p) async =>
-      (await _get('top-filaments', p, limit: 5)).list(
-        'filaments',
-        (j) => RankedItem(
-          id: j.str('id'),
-          name: j.str('name'),
-          subtitle: [
-            j.str('brand_name'),
-            j.str('material_name'),
-          ].where((s) => s.isNotEmpty).join(' · '),
-          colorHex: j.strOrNull('color_hex'),
-          value: j.dbl('total_grams'),
-          count: j.integer('usage_count'),
-        ),
-      );
-
-  @override
   Future<List<RankedItem>> topMaterials(DashboardPeriod p) async =>
       (await _get('top-materials', p, limit: 6)).list(
         'materials',
@@ -68,19 +38,35 @@ class ApiDashboardRepository implements DashboardRepository {
       );
 
   @override
-  Future<(List<Goal>, List<DashboardAlert>)> goalsAlerts(
-    DashboardPeriod p,
-  ) async {
-    final j = await _get('goals-alerts', p);
-    return (
-      j.list('goals', Goal.fromJson),
-      j.list('alerts', DashboardAlert.fromJson),
-    );
-  }
+  Future<GoalsSummary> goals() async =>
+      GoalsSummary.fromJson(await _get('goals-alerts', null));
 
   @override
-  Future<Insights> insights(DashboardPeriod p) async =>
-      Insights.fromJson(await _get('operational-insights', p));
+  Future<void> saveGoals(Map<GoalMetric, double> targets) => _api.put(
+    '/dashboard/goals',
+    body: {
+      'goals': [
+        for (final e in targets.entries)
+          {'metric': e.key.value, 'target': e.value},
+      ],
+    },
+  );
+
+  @override
+  Future<Operations> operations(DashboardPeriod p) async =>
+      Operations.fromJson(await _get('operational-insights', p));
+
+  @override
+  Future<Profitability> profitability(DashboardPeriod p) async =>
+      Profitability.fromJson(await _get('profitability', p, limit: 10));
+
+  @override
+  Future<ResponseTimes> responseTimes(DashboardPeriod p) async =>
+      ResponseTimes.fromJson(await _get('response-times', p));
+
+  @override
+  Future<List<Insight>> insights(DashboardPeriod p) async =>
+      (await _get('insights', p)).list('insights', Insight.fromJson);
 
   @override
   Future<List<RankedItem>> lowStock() async =>

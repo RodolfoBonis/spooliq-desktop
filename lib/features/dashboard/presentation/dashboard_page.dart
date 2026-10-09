@@ -24,6 +24,11 @@ import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_sta
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
 import 'package:spooliq_desktop/features/dashboard/domain/dashboard.dart';
 import 'package:spooliq_desktop/features/dashboard/presentation/dashboard_cubit.dart';
+import 'package:spooliq_desktop/features/dashboard/presentation/widgets/dashboard_section.dart';
+import 'package:spooliq_desktop/features/dashboard/presentation/widgets/goals_card.dart';
+import 'package:spooliq_desktop/features/dashboard/presentation/widgets/insights_panel.dart';
+import 'package:spooliq_desktop/features/dashboard/presentation/widgets/profitability_card.dart';
+import 'package:spooliq_desktop/features/dashboard/presentation/widgets/response_times_card.dart';
 
 const _materialColors = {
   'PLA': Color(0xFF3B82F6),
@@ -195,63 +200,57 @@ class _DashboardViewState extends State<_DashboardView> {
   }
 
   Widget _body(DashboardState state) {
+    final canManage = context.select<SessionCubit, bool>(
+      (c) => c.state.user?.canManage ?? false,
+    );
     return LayoutBuilder(
       builder: (context, c) {
         final wide = c.maxWidth > 1300;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Kpis(section: state.overview, insights: state.insights),
+            _Kpis(section: state.overview),
+            const SizedBox(height: 16),
+            InsightsPanel(
+              section: state.insights,
+              onOpenGoals: () => openGoalsDialog(context),
+            ),
             const SizedBox(height: 16),
             _row(wide, [
               (
                 3,
-                _Card(
-                  title: 'Receita, custo e lucro',
+                DashCard(
+                  title: 'Receita líquida, custo e lucro',
                   child: _TrendChart(section: state.trend),
                 ),
               ),
               (
                 2,
-                _Card(
+                GoalsCard(
+                  section: state.goals,
+                  canManage: canManage,
+                  onEdit: () => openGoalsDialog(context),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            ProfitabilityCard(section: state.profitability),
+            const SizedBox(height: 16),
+            _row(wide, [
+              (
+                1,
+                DashCard(
                   title: 'Funil de conversão',
                   child: _Funnel(section: state.funnel),
                 ),
               ),
+              (1, ResponseTimesCard(section: state.responseTimes)),
             ]),
             const SizedBox(height: 16),
             _row(wide, [
               (
                 1,
-                _Card(
-                  title: 'Melhores clientes',
-                  child: _Ranked(
-                    section: state.customers,
-                    money: true,
-                    onTap: (id) => context.go(Routes.customer(id)),
-                  ),
-                ),
-              ),
-              (
-                1,
-                _Card(
-                  title: 'Filamentos mais usados',
-                  child: _Ranked(section: state.filaments, swatch: true),
-                ),
-              ),
-              (
-                1,
-                _Card(
-                  title: 'Materiais',
-                  child: _Materials(section: state.materials),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 16),
-            _row(wide, [
-              (
-                1,
-                _Card(
+                DashCard(
                   title: 'Estoque baixo',
                   trailing: TextButton(
                     onPressed: () =>
@@ -263,21 +262,21 @@ class _DashboardViewState extends State<_DashboardView> {
               ),
               (
                 1,
-                _Card(
-                  title: 'Metas e alertas',
-                  child: _Goals(section: state.goals),
+                DashCard(
+                  title: 'Consumo por material',
+                  child: _Materials(section: state.materials),
                 ),
               ),
               (
                 1,
-                _Card(
-                  title: 'Custos médios',
-                  child: _Breakdown(section: state.insights),
+                DashCard(
+                  title: 'Composição dos custos',
+                  child: _Breakdown(section: state.operations),
                 ),
               ),
             ]),
             const SizedBox(height: 16),
-            _Card(
+            DashCard(
               title: 'Atividade recente',
               trailing: TextButton(
                 onPressed: () => context.go(Routes.activities),
@@ -372,137 +371,74 @@ class _PeriodPicker extends StatelessWidget {
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.title, required this.child, this.trailing});
-
-  final String title;
-  final Widget child;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) =>
-      SectionCard(title: title, trailing: trailing, child: child);
-}
-
-/// Conteúdo padrão de uma seção: skeleton, erro ou dados.
-Widget _section<T>(
-  BuildContext context,
-  Section<T> s,
-  Widget Function(T data) builder, {
-  double height = 180,
-}) {
-  final ext = Theme.of(context).extension<FormaThemeExtension>()!;
-  final typo = context.formaTypography;
-  if (s.loading) return FormaSkeleton.box(height: height);
-  if (s.error != null) {
-    return SizedBox(
-      height: height,
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.cloud_off_outlined, size: 16, color: ext.textHint),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                s.error!,
-                style: typo.caption12.copyWith(color: ext.textMuted),
-              ),
-            ),
-            TextButton(
-              onPressed: () => unawaited(context.read<DashboardCubit>().load()),
-              child: const Text('Tentar de novo'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  return builder(s.data as T);
-}
-
-Widget _emptyText(BuildContext context, String text) {
-  final ext = Theme.of(context).extension<FormaThemeExtension>()!;
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24),
-    child: Center(
-      child: Text(
-        text,
-        style: context.formaTypography.body13.copyWith(color: ext.textHint),
-      ),
-    ),
-  );
-}
-
 class _Kpis extends StatelessWidget {
-  const _Kpis({required this.section, required this.insights});
+  const _Kpis({required this.section});
 
   final Section<Overview> section;
-  final Section<Insights> insights;
 
   @override
   Widget build(BuildContext context) {
     final o = section.data;
-    final i = insights.data;
-    final items = <(String, String, double?, IconData, bool)>[
-      (
-        'Receita',
-        o == null ? '' : Fmt.cents(o.revenueCents),
-        o?.revenueChange,
-        Icons.trending_up_rounded,
-        false,
+    String money(int Function(Overview) f) => o == null ? '' : Fmt.cents(f(o));
+    final items = [
+      _Kpi(
+        label: 'Receita líquida',
+        value: money((o) => o.netRevenueCents),
+        change: o?.netRevenueChange,
+        icon: Icons.trending_up_rounded,
+        tooltip: 'Vendas aprovadas no período, sem imposto e frete.',
       ),
-      (
-        'Orçamentos',
-        o == null ? '' : '${o.budgets}',
-        o?.budgetsChange,
-        Icons.request_quote_outlined,
-        false,
+      _Kpi(
+        label: 'Lucro',
+        value: money((o) => o.profitCents),
+        change: o?.profitChange,
+        icon: Icons.savings_outlined,
+        detail: o == null
+            ? null
+            : '${Fmt.cents(o.profitRealizedCents)} realizado · '
+                  '${Fmt.cents(o.profitForecastCents)} previsto',
+        tooltip:
+            'Margem dos orçamentos aprovados menos descontos. Realizado = '
+            'concluídos; previsto = aprovados e em impressão.',
       ),
-      (
-        'Ticket médio',
-        o == null ? '' : Fmt.cents(o.avgTicketCents),
-        o?.avgTicketChange,
-        Icons.sell_outlined,
-        false,
+      _Kpi(
+        label: 'Margem',
+        value: o == null ? '' : Fmt.percent(o.profitMargin),
+        change: o?.marginPointsChange,
+        points: true,
+        icon: Icons.percent_rounded,
+        tooltip: 'Lucro ÷ receita líquida (ponderada pelo valor).',
       ),
-      (
-        'Aprovação',
-        o == null ? '' : Fmt.percent(o.approvalRate),
-        o?.approvalRateChange,
-        Icons.verified_outlined,
-        false,
+      _Kpi(
+        label: 'Ticket médio',
+        value: money((o) => o.avgTicketCents),
+        change: o?.avgTicketChange,
+        icon: Icons.sell_outlined,
       ),
-      (
-        'Margem média',
-        o == null ? '' : Fmt.percent(o.profitMargin),
-        o?.profitMarginChange,
-        Icons.savings_outlined,
-        false,
+      _Kpi(
+        label: 'Aprovação',
+        value: o == null ? '' : Fmt.percent(o.approvalRate),
+        change: o?.approvalRateChange,
+        icon: Icons.verified_outlined,
+        tooltip: 'Aprovados ÷ (aprovados + recusados + expirados).',
       ),
-      (
-        'Horas de impressão',
-        i == null ? '' : Fmt.number(i.printHours),
-        i?.printTimeChange,
-        Icons.schedule_rounded,
-        false,
+      _Kpi(
+        label: 'Lucro por hora',
+        value: o == null ? '' : '${Fmt.cents(o.profitPerHourCents)}/h',
+        change: o?.profitPerHourChange,
+        icon: Icons.schedule_rounded,
+        detail: o == null
+            ? null
+            : '${Fmt.number(o.printHours, decimals: 1)} h de impressão',
+        tooltip: 'Lucro ÷ horas de impressão das vendas.',
       ),
     ];
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final (idx, (label, value, change, icon, inverse))
-            in items.indexed) ...[
+        for (final (idx, kpi) in items.indexed) ...[
           if (idx > 0) const SizedBox(width: 12),
-          Expanded(
-            child: _Kpi(
-              label: label,
-              value: value,
-              change: change,
-              icon: icon,
-              inverse: inverse,
-              loading: idx == 5 ? insights.loading : section.loading,
-            ),
-          ),
+          Expanded(child: kpi.withLoading(loading: section.loading)),
         ],
       ],
     );
@@ -515,8 +451,11 @@ class _Kpi extends StatelessWidget {
     required this.value,
     required this.change,
     required this.icon,
-    required this.loading,
+    this.loading = false,
     this.inverse = false,
+    this.points = false,
+    this.detail,
+    this.tooltip,
   });
 
   final String label;
@@ -524,7 +463,28 @@ class _Kpi extends StatelessWidget {
   final double? change;
   final IconData icon;
   final bool loading;
+
+  /// Queda é boa (ex.: custo).
   final bool inverse;
+
+  /// A variação está em pontos percentuais, não em %.
+  final bool points;
+
+  /// Linha extra abaixo da variação.
+  final String? detail;
+  final String? tooltip;
+
+  _Kpi withLoading({required bool loading}) => _Kpi(
+    label: label,
+    value: value,
+    change: change,
+    icon: icon,
+    loading: loading,
+    inverse: inverse,
+    points: points,
+    detail: detail,
+    tooltip: tooltip,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -550,6 +510,15 @@ class _Kpi extends StatelessWidget {
                   style: typo.caption12.copyWith(color: ext.textMuted),
                 ),
               ),
+              if (tooltip != null)
+                Tooltip(
+                  message: tooltip,
+                  child: Icon(
+                    Icons.info_outline_rounded,
+                    size: 13,
+                    color: ext.textHint,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -591,7 +560,10 @@ class _Kpi extends StatelessWidget {
                 const SizedBox(width: 2),
                 Flexible(
                   child: Text(
-                    '${Fmt.percent(c.abs())} vs. período anterior',
+                    points
+                        ? '${Fmt.number(c.abs(), decimals: 1)} p.p. '
+                              'vs. período anterior'
+                        : '${Fmt.percent(c.abs())} vs. período anterior',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: typo.caption12.copyWith(
@@ -605,6 +577,15 @@ class _Kpi extends StatelessWidget {
                 ),
               ],
             ),
+          if (!loading && detail != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              detail!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: typo.caption12.copyWith(color: ext.textHint),
+            ),
+          ],
         ],
       ),
     );
@@ -620,15 +601,15 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    return _section(context, section, height: 260, (points) {
+    return dashSection(context, section, height: 260, (points) {
       if (points.isEmpty) {
         return SizedBox(
           height: 260,
-          child: _emptyText(context, 'Sem dados no período.'),
+          child: dashEmpty(context, 'Sem dados no período.'),
         );
       }
       final series = [
-        ('Receita', ext.primaryColor, (TrendPoint p) => p.revenueCents),
+        ('Receita líquida', ext.primaryColor, (TrendPoint p) => p.revenueCents),
         ('Custo', ext.textHint, (TrendPoint p) => p.costCents),
         ('Lucro', ext.successColor, (TrendPoint p) => p.profitCents),
       ];
@@ -771,9 +752,9 @@ class _Funnel extends StatelessWidget {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     final brightness = Theme.of(context).brightness;
-    return _section(context, section, height: 260, (steps) {
+    return dashSection(context, section, height: 260, (steps) {
       if (steps.isEmpty) {
-        return _emptyText(context, 'Sem orçamentos no período.');
+        return dashEmpty(context, 'Sem orçamentos no período.');
       }
       final max = steps.fold<int>(1, (m, s) => s.count > m ? s.count : m);
       return Column(
@@ -844,94 +825,6 @@ class _Funnel extends StatelessWidget {
   }
 }
 
-class _Ranked extends StatelessWidget {
-  const _Ranked({
-    required this.section,
-    this.money = false,
-    this.swatch = false,
-    this.onTap,
-  });
-
-  final Section<List<RankedItem>> section;
-  final bool money;
-  final bool swatch;
-  final void Function(String id)? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
-    final typo = context.formaTypography;
-    return _section(context, section, (items) {
-      if (items.isEmpty) return _emptyText(context, 'Sem dados no período.');
-      final max = items.fold<num>(1, (m, i) => i.value > m ? i.value : m);
-      return Column(
-        children: [
-          for (final (idx, i) in items.indexed)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: onTap == null ? null : () => onTap!(i.id),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        if (swatch)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilamentSwatch(
-                              colorHex: i.colorHex,
-                            ),
-                          )
-                        else
-                          SizedBox(
-                            width: 22,
-                            child: Text(
-                              '${idx + 1}',
-                              style: typo.caption12Med.copyWith(
-                                color: ext.textHint,
-                              ),
-                            ),
-                          ),
-                        Expanded(
-                          child: Text(
-                            i.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: typo.body13.copyWith(color: ext.textPrimary),
-                          ),
-                        ),
-                        Text(
-                          money
-                              ? Fmt.cents(i.value.toInt())
-                              : Fmt.grams(i.value),
-                          style: typo.body13.copyWith(
-                            color: ext.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: LinearProgressIndicator(
-                        value: i.value / max,
-                        minHeight: 4,
-                        backgroundColor: ext.appBackground,
-                        color: ext.primaryColor.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      );
-    });
-  }
-}
-
 class _Materials extends StatelessWidget {
   const _Materials({required this.section});
 
@@ -941,10 +834,10 @@ class _Materials extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    return _section(context, section, (items) {
+    return dashSection(context, section, (items) {
       final total = items.fold<num>(0, (s, i) => s + i.value);
       if (items.isEmpty || total == 0) {
-        return _emptyText(context, 'Sem consumo no período.');
+        return dashEmpty(context, 'Sem consumo no período.');
       }
       Color colorOf(RankedItem i) => _materialColor(i.name) ?? ext.textHint;
       return Row(
@@ -1017,8 +910,8 @@ class _LowStock extends StatelessWidget {
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    return _section(context, section, (items) {
-      if (items.isEmpty) return _emptyText(context, 'Tudo abastecido. 👌');
+    return dashSection(context, section, (items) {
+      if (items.isEmpty) return dashEmpty(context, 'Tudo abastecido. 👌');
       return Column(
         children: [
           for (final i in items.take(6))
@@ -1062,95 +955,10 @@ class _LowStock extends StatelessWidget {
   }
 }
 
-class _Goals extends StatelessWidget {
-  const _Goals({required this.section});
-
-  final Section<(List<Goal>, List<DashboardAlert>)> section;
-
-  @override
-  Widget build(BuildContext context) {
-    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
-    final typo = context.formaTypography;
-    return _section(context, section, (data) {
-      final (goals, alerts) = data;
-      if (goals.isEmpty && alerts.isEmpty) {
-        return _emptyText(context, 'Nada que exija atenção.');
-      }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final g in goals)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          g.name,
-                          style: typo.body13.copyWith(color: ext.textPrimary),
-                        ),
-                      ),
-                      Text(
-                        Fmt.percent(g.progress, decimals: 0),
-                        style: typo.caption12Med.copyWith(color: ext.textMuted),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: (g.progress / 100).clamp(0, 1),
-                      minHeight: 6,
-                      backgroundColor: ext.appBackground,
-                      color: g.progress >= 100
-                          ? ext.successColor
-                          : ext.primaryColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          for (final a in alerts)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: a.severity == 'high' || a.severity == 'critical'
-                    ? ext.errorSurface
-                    : ext.warningSurface,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 16,
-                    color: ext.warningText,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      a.message,
-                      style: typo.caption12.copyWith(color: ext.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-    });
-  }
-}
-
 class _Breakdown extends StatelessWidget {
   const _Breakdown({required this.section});
 
-  final Section<Insights> section;
+  final Section<Operations> section;
 
   static const _colors = [
     Color(0xFF3B82F6),
@@ -1159,17 +967,20 @@ class _Breakdown extends StatelessWidget {
     Color(0xFFF97316),
     Color(0xFF8B5CF6),
     Color(0xFFA78BFA),
+    Color(0xFF22C55E),
+    Color(0xFF06B6D4),
+    Color(0xFFEC4899),
+    Color(0xFF84CC16),
+    Color(0xFF64748B),
   ];
 
   @override
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    return _section(context, section, (insights) {
-      final entries = insights.breakdown.entries
-          .where((e) => e.value > 0)
-          .toList();
-      if (entries.isEmpty) return _emptyText(context, 'Sem custos no período.');
+    return dashSection(context, section, (ops) {
+      final entries = ops.breakdown.entries.where((e) => e.value > 0).toList();
+      if (entries.isEmpty) return dashEmpty(context, 'Sem custos no período.');
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1218,7 +1029,7 @@ class _Breakdown extends StatelessWidget {
             ),
           const SizedBox(height: 8),
           Text(
-            'Taxa de rejeição: ${Fmt.percent(insights.rejectionRate)}',
+            'Taxa de recusa: ${Fmt.percent(ops.rejectionRate)}',
             style: typo.caption12.copyWith(color: ext.textHint),
           ),
         ],
@@ -1234,8 +1045,8 @@ class _ActivityFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _section(context, section, (items) {
-      if (items.isEmpty) return _emptyText(context, 'Nenhuma atividade ainda.');
+    return dashSection(context, section, (items) {
+      if (items.isEmpty) return dashEmpty(context, 'Nenhuma atividade ainda.');
       return Column(
         children: [for (final a in items) ActivityTile(a)],
       );

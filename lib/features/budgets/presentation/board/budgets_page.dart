@@ -31,7 +31,11 @@ enum BudgetsView { board, table }
 
 /// Orçamentos: quadro kanban (padrão) ou lista.
 class BudgetsPage extends StatefulWidget {
-  const BudgetsPage({super.key});
+  const BudgetsPage({super.key, this.initialStatus});
+
+  /// Abre a lista já filtrada por status (ex.: ações dos insights do
+  /// dashboard). Não altera a visualização salva nas preferências.
+  final BudgetStatus? initialStatus;
 
   @override
   State<BudgetsPage> createState() => _BudgetsPageState();
@@ -39,10 +43,12 @@ class BudgetsPage extends StatefulWidget {
 
 class _BudgetsPageState extends State<BudgetsPage> {
   static const _prefKey = 'budgets.view';
-  late BudgetsView _view = BudgetsView.values.firstWhere(
-    (v) => v.name == di<SharedPreferences>().getString(_prefKey),
-    orElse: () => BudgetsView.board,
-  );
+  late BudgetsView _view = widget.initialStatus != null
+      ? BudgetsView.table
+      : BudgetsView.values.firstWhere(
+          (v) => v.name == di<SharedPreferences>().getString(_prefKey),
+          orElse: () => BudgetsView.board,
+        );
 
   late final BoardCubit _board = BoardCubit(di());
   late final PagedListCubit<Budget> _table = PagedListCubit<Budget>(
@@ -50,8 +56,8 @@ class _BudgetsPageState extends State<BudgetsPage> {
     idOf: (b) => b.id,
     initialQuery: const PageQuery(sortBy: 'created_at'),
   );
-  BudgetFilter _filter = const BudgetFilter();
-  BudgetStatus? _tableStatus;
+  late BudgetFilter _filter = BudgetFilter(status: widget.initialStatus);
+  late BudgetStatus? _tableStatus = widget.initialStatus;
 
   @override
   void initState() {
