@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(spooliq_desktop LANGUAGES CXX)
 
-set(BINARY_NAME "spooliq_desktop")
+set(BINARY_NAME "SpoolIQ")
 
 cmake_policy(SET CMP0063 NEW)
 
