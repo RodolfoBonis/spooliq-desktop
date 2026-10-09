@@ -94,36 +94,40 @@ class _DashboardViewState extends State<_DashboardView> {
 
   /// Durante a exportação o cabeçalho (período e data) entra na imagem.
   bool _exporting = false;
+  DateTime? _exportedAt;
 
   Future<void> _export(DashboardPeriod period) async {
     final now = DateTime.now();
-    final location = await getSaveLocation(
-      suggestedName:
-          'dashboard-${period.value}-${DateFormat('yyyy-MM-dd').format(now)}'
-          '.png',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Imagem PNG', extensions: ['png']),
-      ],
-    );
-    if (location == null || !mounted) return;
-    setState(() => _exporting = true);
+    setState(() => _exportedAt = now);
     try {
+      final location = await getSaveLocation(
+        suggestedName:
+            'dashboard-${period.value}-${DateFormat('yyyy-MM-dd').format(now)}'
+            '.png',
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'Imagem PNG', extensions: ['png']),
+        ],
+      );
+      if (location == null || !mounted) return;
+      // O diálogo do sistema nem sempre acrescenta a extensão.
+      final path = location.path.toLowerCase().endsWith('.png')
+          ? location.path
+          : '${location.path}.png';
+
+      setState(() => _exporting = true);
       await WidgetsBinding.instance.endOfFrame;
-      final boundary =
-          _captureKey.currentContext!.findRenderObject()!
-              as RenderRepaintBoundary;
+      final boundary = _captureKey.currentContext?.findRenderObject();
+      if (boundary is! RenderRepaintBoundary) {
+        throw StateError('Área do dashboard não encontrada para captura.');
+      }
       final image = await boundary.toImage(pixelRatio: 2);
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
-      await File(location.path).writeAsBytes(
-        png!.buffer.asUint8List(),
-        flush: true,
-      );
+      if (png == null) throw StateError('Falha ao codificar o PNG.');
+      await File(path).writeAsBytes(png.buffer.asUint8List(), flush: true);
       if (mounted) Toasts.success(context, 'Dashboard exportado');
     } on Object catch (e, st) {
-      unawaited(
-        AppLogger.error(e, st, reason: 'dashboard_export'),
-      );
+      unawaited(AppLogger.error(e, st, reason: 'dashboard_export'));
       if (mounted) Toasts.error(context, e);
     } finally {
       if (mounted) setState(() => _exporting = false);
@@ -157,7 +161,7 @@ class _DashboardViewState extends State<_DashboardView> {
           message: 'Exportar como imagem (PNG)',
           child: FormaIconButton(
             icon: const Icon(Icons.ios_share_rounded, size: 18),
-            onPressed: _exporting
+            onPressed: _exporting || state.anyLoading
                 ? null
                 : () => unawaited(_export(state.period)),
           ),
@@ -177,7 +181,7 @@ class _DashboardViewState extends State<_DashboardView> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
                     'SpoolIQ · últimos ${state.period.label.toLowerCase()} · '
-                    'gerado em ${Fmt.dateTime(DateTime.now())}',
+                    'gerado em ${Fmt.dateTime(_exportedAt)}',
                     style: typo.body14Medium.copyWith(color: ext.textMuted),
                   ),
                 ),
