@@ -51,17 +51,17 @@ class ApiModel3DRepository implements Model3DRepository {
     String id, {
     required String name,
     required String? customerId,
-    String? description,
-    String? notes,
-    String? tags,
+    required String description,
+    required String notes,
+    required String tags,
   }) async => Model3D.fromJson(
     await _api.putJson(
       '/models3d/$id',
       body: {
         'name': name.trim(),
-        'description': description?.trim() ?? '',
-        'notes': notes?.trim() ?? '',
-        'tags': tags?.trim() ?? '',
+        'description': description.trim(),
+        'notes': notes.trim(),
+        'tags': tags.trim(),
         // Sempre enviado: null explícito desvincula o cliente na API.
         'customer_id': customerId,
       },

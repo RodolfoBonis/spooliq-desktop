@@ -198,14 +198,15 @@ abstract interface class Model3DRepository {
     void Function(int sent, int total)? onProgress,
   });
 
-  /// Atualiza os metadados. `customerId` nulo desvincula o cliente.
+  /// Substitui todos os metadados: texto vazio limpa o campo e
+  /// `customerId` nulo desvincula o cliente.
   Future<Model3D> update(
     String id, {
     required String name,
     required String? customerId,
-    String? description,
-    String? notes,
-    String? tags,
+    required String description,
+    required String notes,
+    required String tags,
   });
   Future<void> delete(String id);
   Future<Uint8List> download(String id);

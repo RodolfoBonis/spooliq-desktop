@@ -10,6 +10,7 @@ import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/form_dialog.dart';
@@ -305,6 +306,15 @@ class _ModelsView extends StatelessWidget {
         label = (await di<CustomerRepository>().get(m.customerId!)).name;
       } on ApiError {
         // Mantém o rótulo genérico; o vínculo continua sendo editável.
+      } on Object catch (e, st) {
+        unawaited(
+          AppLogger.error(
+            e,
+            st,
+            reason: 'model_customer',
+            category: 'models3d',
+          ),
+        );
       }
       customer = FormaSelectOption(value: m.customerId!, label: label);
     }
