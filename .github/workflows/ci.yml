@@ -50,10 +50,39 @@ jobs:
         shell: bash
         run: dart pub token add https://pub.rodolfodebonis.com.br --env-var PUB_TOKEN
       - run: flutter pub get
+      # Assinatura só roda quando os secrets existem (builds sem eles saem
+      # com assinatura ad-hoc / sem assinatura, como hoje).
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS' && env.MACOS_CERT_P12 != ''
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p temp "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p temp "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k temp "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+      - name: Decode Windows signing certificate
+        if: runner.os == 'Windows' && env.WINDOWS_CERT_PFX_B64 != ''
+        shell: bash
+        env:
+          WINDOWS_CERT_PFX_B64: ${{ secrets.WINDOWS_CERT_PFX }}
+        run: |
+          echo "$WINDOWS_CERT_PFX_B64" | base64 --decode > "$RUNNER_TEMP/cert.pfx"
+          echo "WINDOWS_CERT_PFX=$RUNNER_TEMP/cert.pfx" >> "$GITHUB_ENV"
       - run: ${{ matrix.cmd }}
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: spooliq-${{ runner.os }}
