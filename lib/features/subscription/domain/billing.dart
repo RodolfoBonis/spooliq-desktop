@@ -1,6 +1,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
 
+/// Sufixo de preço para o ciclo de cobrança (`/mês`, `/trimestre`, `/ano`).
+String billingCycleSuffix(String? cycle) => switch (cycle?.toUpperCase()) {
+  'YEARLY' || 'ANNUAL' => '/ano',
+  'QUARTERLY' => '/trimestre',
+  _ => '/mês',
+};
+
 /// Lista que pode vir como array puro, `{data: []}` ou `{<key>: []}`.
 List<T> looseList<T>(Object? body, T Function(Json) parse, [String? key]) {
   var raw = body;
@@ -82,11 +89,7 @@ class Plan extends Equatable {
   final bool isActive;
   final bool popular;
 
-  String get cycleLabel => switch (cycle.toUpperCase()) {
-    'YEARLY' || 'ANNUAL' => '/ano',
-    'QUARTERLY' => '/trimestre',
-    _ => '/mês',
-  };
+  String get cycleLabel => billingCycleSuffix(cycle);
 
   @override
   List<Object?> get props => [id, name, price, cycle, features, isActive];

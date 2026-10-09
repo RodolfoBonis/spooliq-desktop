@@ -5,6 +5,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/form_dialog.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
@@ -25,10 +26,26 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
   final Set<String> _selected = {};
   String? _error;
 
+  /// Catálogo de recursos da plataforma (carregado ao abrir o editor).
+  List<AvailableFeature>? _catalog;
+
+  Future<List<AvailableFeature>> _loadCatalog() async {
+    if (_catalog != null) return _catalog!;
+    try {
+      return _catalog = await _repo.availableFeatures();
+    } on ApiError catch (e) {
+      // O editor continua funcionando com texto livre.
+      AppLogger.warning('Catálogo de recursos indisponível', error: e);
+      return const [];
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+    // Pré-carrega o catálogo para o editor abrir sem esperar a rede.
+    unawaited(_loadCatalog());
   }
 
   Future<void> _load() async {
@@ -267,29 +284,11 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       ),
     );
     if (result == null || !mounted) return;
-    final execute = await FormaConfirmDialog.show(
+    await FormaSideSheet.show<void>(
       context,
-      title: 'Executar migração agora?',
-      message:
-          '${result.total} empresa(s) de "${result.fromPlan ?? from.name}" '
-          'para "${result.toPlan ?? ''}". Status: ${result.statusLabel}.',
-      confirmLabel: 'Executar',
-      cancelLabel: 'Depois',
+      builder: (_) => _MigrationSheet(migration: result),
     );
-    if (!execute || !mounted) return;
-    try {
-      final done = await _repo.executeMigration(result.id);
-      await _load();
-      if (mounted) {
-        Toasts.success(
-          context,
-          'Migração ${done.statusLabel.toLowerCase()}',
-          description: '${done.successful} ok · ${done.failed} com falha',
-        );
-      }
-    } on ApiError catch (e) {
-      if (mounted) Toasts.error(context, e);
-    }
+    await _load();
   }
 
   Future<void> _delete(Plan p) async {
@@ -361,6 +360,8 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     final description = TextEditingController(text: p?.description);
     num? price = p?.price;
     var cycle = p?.cycle ?? 'MONTHLY';
+    final catalog = await _loadCatalog();
+    if (!mounted) return;
     final features = TextEditingController(
       text: p?.features.map((f) => f.name).join('\n'),
     );
@@ -413,9 +414,44 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
           maxLines: 6,
           minLines: 4,
         ),
+        if (catalog.isNotEmpty)
+          FormaCombobox<AvailableFeature>(
+            label: 'Adicionar do catálogo',
+            hint: 'Buscar recurso…',
+            search: (q) async {
+              final query = q.trim().toLowerCase();
+              final current = _featureLines(features.text).toSet();
+              return [
+                for (final f in catalog)
+                  if (f.isActive &&
+                      !current.contains(f.name) &&
+                      (query.isEmpty || f.name.toLowerCase().contains(query)))
+                    FormaSelectOption(
+                      value: f,
+                      label: f.name,
+                      subtitle: f.category,
+                    ),
+              ];
+            },
+            onChanged: (option) {
+              if (option == null) return;
+              final lines = [
+                ..._featureLines(features.text),
+                option.value.name,
+              ];
+              setState(() => features.text = lines.join('\n'));
+            },
+          ),
       ],
-      onSubmit: () {
+      // Sem validação de recursos na API: ela compara com uma lista fixa de
+      // nomes técnicos e rejeitaria os recursos em texto livre já usados.
+      onSubmit: () async {
         if (price == null) throw const ValidationError('Informe o preço.');
+        final byName = {for (final f in catalog) f.name: f};
+        final list = [
+          for (final line in _featureLines(features.text))
+            byName[line]?.toPlanFeature() ?? PlanFeature(name: line),
+        ];
         return _repo.savePlan(
           Plan(
             id: p?.id ?? '',
@@ -424,10 +460,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
             price: price!.toDouble(),
             cycle: cycle,
             isActive: p?.isActive ?? true,
-            features: [
-              for (final line in features.text.split('\n'))
-                if (line.trim().isNotEmpty) PlanFeature(name: line.trim()),
-            ],
+            features: list,
           ),
           create: p == null,
         );
@@ -439,6 +472,11 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       Toasts.success(context, p == null ? 'Plano criado' : 'Plano atualizado');
     }
   }
+
+  static List<String> _featureLines(String text) => [
+    for (final line in text.split('\n'))
+      if (line.trim().isNotEmpty) line.trim(),
+  ];
 
   Future<void> _details(Plan p) => FormaSideSheet.show<void>(
     context,
@@ -458,6 +496,7 @@ class _PlanSheet extends StatefulWidget {
 class _PlanSheetState extends State<_PlanSheet> {
   PlanStats? _stats;
   List<AdminCompany> _companies = const [];
+  List<PlanAuditEntry>? _history;
   String? _error;
   ReportPeriod _period = ReportPeriod.monthly;
   PlanFinancialReport? _report;
@@ -484,6 +523,17 @@ class _PlanSheetState extends State<_PlanSheet> {
     super.initState();
     unawaited(_load());
     unawaited(_loadReport());
+    unawaited(_loadHistory());
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final page = await di<AdminRepository>().planHistory(widget.plan.id);
+      if (mounted) setState(() => _history = page.items);
+    } on ApiError catch (e) {
+      AppLogger.warning('Histórico do plano indisponível', error: e);
+      if (mounted) setState(() => _history = const []);
+    }
   }
 
   Future<void> _load() async {
@@ -626,8 +676,190 @@ class _PlanSheetState extends State<_PlanSheet> {
                       subtitle: c.email == null ? null : Text(c.email!),
                       trailing: SubscriptionStatusBadge(c.status),
                     ),
+                const SizedBox(height: 20),
+                Text(
+                  'Histórico de alterações',
+                  style: typo.title15.copyWith(color: ext.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                _PlanHistory(entries: _history),
               ],
             ),
+    );
+  }
+}
+
+/// Status de uma migração: executar (se agendada), atualizar e ver o
+/// resultado por empresa.
+class _MigrationSheet extends StatefulWidget {
+  const _MigrationSheet({required this.migration});
+
+  final PlanMigration migration;
+
+  @override
+  State<_MigrationSheet> createState() => _MigrationSheetState();
+}
+
+class _MigrationSheetState extends State<_MigrationSheet> {
+  final AdminRepository _repo = di<AdminRepository>();
+  late PlanMigration _m = widget.migration;
+  bool _busy = false;
+
+  Future<void> _run(Future<PlanMigration> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      final m = await action();
+      if (mounted) setState(() => _m = m);
+    } on ApiError catch (e) {
+      if (mounted) Toasts.error(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final m = _m;
+    return FormaSideSheetScaffold(
+      title: 'Migração de planos',
+      subtitle: '${m.fromPlan ?? '?'} → ${m.toPlan ?? '?'}',
+      headerActions: [
+        FormaButton.secondary(
+          label: 'Atualizar',
+          small: true,
+          isLoading: _busy && !m.canExecute,
+          onPressed: _busy
+              ? null
+              : () => unawaited(_run(() => _repo.migration(m.id))),
+        ),
+        if (m.canExecute)
+          FormaButton.primary(
+            label: 'Executar agora',
+            small: true,
+            isLoading: _busy,
+            onPressed: _busy
+                ? null
+                : () => unawaited(_run(() => _repo.executeMigration(m.id))),
+          ),
+      ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            m.statusLabel,
+            style: typo.h4.copyWith(color: ext.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            [
+              '${m.total} empresa(s)',
+              if (m.scheduledFor != null)
+                'agendada para ${Fmt.dateTime(m.scheduledFor)}',
+              if (m.completedAt != null)
+                'concluída em ${Fmt.dateTime(m.completedAt)}',
+            ].join(' · '),
+            style: typo.body13.copyWith(color: ext.textMuted),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                  label: 'Migradas',
+                  value: '${m.successful}',
+                  icon: Icons.check_circle_outline,
+                  tone: ext.successColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatCard(
+                  label: 'Com falha',
+                  value: '${m.failed}',
+                  icon: Icons.error_outline,
+                  tone: ext.errorColor,
+                ),
+              ),
+            ],
+          ),
+          if (m.summary != null && m.summary!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(m.summary!, style: typo.body13.copyWith(color: ext.textMuted)),
+          ],
+          if (m.results.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              'Empresas',
+              style: typo.title15.copyWith(color: ext.textPrimary),
+            ),
+            const SizedBox(height: 6),
+            for (final r in m.results)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(
+                  r.success ? Icons.check_rounded : Icons.close_rounded,
+                  size: 18,
+                  color: r.success ? ext.successColor : ext.errorColor,
+                ),
+                title: Text(r.companyName),
+                subtitle: r.error == null ? null : Text(r.error!),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanHistory extends StatelessWidget {
+  const _PlanHistory({required this.entries});
+
+  /// null = carregando.
+  final List<PlanAuditEntry>? entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final list = entries;
+    if (list == null) return const LoadingView();
+    if (list.isEmpty) {
+      return Text(
+        'Nenhuma alteração registrada.',
+        style: typo.body13.copyWith(color: ext.textMuted),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final e in list)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  [
+                    e.actionLabel,
+                    if (e.changedFields.isNotEmpty) e.changedFields.join(', '),
+                  ].join(' · '),
+                  style: typo.body13.copyWith(color: ext.textPrimary),
+                ),
+                Text(
+                  [
+                    Fmt.dateTime(e.createdAt),
+                    ?e.userEmail,
+                    if (e.reason != null && e.reason!.isNotEmpty) e.reason!,
+                  ].join(' · '),
+                  style: typo.caption12.copyWith(color: ext.textHint),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
