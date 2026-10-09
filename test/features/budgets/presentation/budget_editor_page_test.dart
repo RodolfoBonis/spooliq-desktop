@@ -11,6 +11,8 @@ import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
 import 'package:spooliq_desktop/core/routing/app_router.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
+import 'package:spooliq_desktop/core/update/update_checker.dart';
+import 'package:spooliq_desktop/core/update/update_cubit.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_draft.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
@@ -139,6 +141,10 @@ void main() {
           BlocProvider<SessionCubit>.value(value: session),
           BlocProvider(create: (_) => ThemeModeCubit(prefs)),
           BlocProvider(create: (_) => CurrentCompanyCubit(di())),
+          // Sem start(): nenhuma checagem de atualização no teste.
+          BlocProvider(
+            create: (_) => UpdateCubit(UpdateChecker(feedUrl: ''), prefs),
+          ),
         ],
         child: MaterialApp.router(
           theme: SpooliqTheme.light,

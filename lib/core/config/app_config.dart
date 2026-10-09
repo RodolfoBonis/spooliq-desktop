@@ -13,12 +13,14 @@ class AppConfig {
     required this.sentryDsn,
     required this.environment,
     required this.publicBudgetBaseUrl,
+    this.updateFeedUrl = '',
   });
 
   /// Valores padrão do flavor, sobrescrevíveis via `--dart-define`.
   factory AppConfig.forFlavor(Flavor flavor) {
     const apiOverride = String.fromEnvironment('API_BASE_URL');
     const publicOverride = String.fromEnvironment('PUBLIC_BUDGET_BASE_URL');
+    const updateOverride = String.fromEnvironment('UPDATE_FEED_URL');
     final (api, public) = switch (flavor) {
       Flavor.development => (
         'http://localhost:8080/v1',
@@ -38,6 +40,12 @@ class AppConfig {
       sentryDsn: const String.fromEnvironment('SENTRY_DSN'),
       environment: flavor.name,
       publicBudgetBaseUrl: publicOverride.isEmpty ? public : publicOverride,
+      // Só builds de produção procuram atualização.
+      updateFeedUrl: updateOverride.isNotEmpty
+          ? updateOverride
+          : flavor == Flavor.production
+          ? 'https://api.github.com/repos/RodolfoBonis/spooliq-desktop/releases/latest'
+          : '',
     );
   }
 
@@ -48,5 +56,9 @@ class AppConfig {
   /// Base da página pública de aprovação (`<base>/<token>`).
   final String publicBudgetBaseUrl;
 
+  /// Última release (GitHub API); vazio = não verificar atualizações.
+  final String updateFeedUrl;
+
   bool get hasSentry => sentryDsn.isNotEmpty;
+  bool get checksForUpdates => updateFeedUrl.isNotEmpty;
 }

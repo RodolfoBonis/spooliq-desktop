@@ -7,6 +7,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/app/shell/command_palette.dart';
 import 'package:spooliq_desktop/app/shell/subscription_banner.dart';
+import 'package:spooliq_desktop/app/shell/update_banner.dart';
 import 'package:spooliq_desktop/app/shell/user_menu.dart';
 import 'package:spooliq_desktop/app/theme_mode_cubit.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
@@ -107,6 +108,7 @@ class _AppShellState extends State<AppShell> {
                             ? _newBudget
                             : null,
                       ),
+                      const UpdateBanner(),
                       const SubscriptionBanner(),
                       Expanded(child: widget.child),
                     ],
