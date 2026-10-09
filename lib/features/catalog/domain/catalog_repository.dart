@@ -39,6 +39,7 @@ abstract interface class CatalogRepository {
   Future<Paginated<StockMovement>> stockMovements(
     String filamentId, {
     int page = 1,
+    StockMovementType? type,
   });
   Future<StockMovement> addStockMovement(
     String filamentId, {
