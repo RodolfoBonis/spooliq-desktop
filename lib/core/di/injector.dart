@@ -26,6 +26,9 @@ import 'package:spooliq_desktop/features/dashboard/data/api_dashboard_repository
 import 'package:spooliq_desktop/features/dashboard/domain/dashboard.dart';
 import 'package:spooliq_desktop/features/models3d/data/api_model3d_repository.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/notifications/data/api_notification_repository.dart';
+import 'package:spooliq_desktop/features/notifications/data/local_system_notifier.dart';
+import 'package:spooliq_desktop/features/notifications/domain/notification.dart';
 import 'package:spooliq_desktop/features/presets/data/api_preset_repository.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 import 'package:spooliq_desktop/features/subscription/data/api_billing_repository.dart';
@@ -66,6 +69,10 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerLazySingleton<AccountRepository>(
       () => ApiAccountRepository(api),
     )
+    ..registerLazySingleton<NotificationRepository>(
+      () => ApiNotificationRepository(api),
+    )
+    ..registerLazySingleton<SystemNotifier>(LocalSystemNotifier.new)
     ..registerLazySingleton<BudgetRepository>(() => ApiBudgetRepository(api))
     ..registerLazySingleton<CustomerRepository>(
       () => ApiCustomerRepository(api),
