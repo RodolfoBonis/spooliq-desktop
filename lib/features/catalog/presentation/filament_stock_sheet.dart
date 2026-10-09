@@ -5,6 +5,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog_repository.dart';
@@ -48,10 +49,13 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
   final _note = TextEditingController();
   bool _saving = false;
 
+  /// Descarta respostas de buscas antigas (ex.: filtro trocado no meio).
+  int _request = 0;
+
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    unawaited(_loadHistory());
   }
 
   @override
@@ -60,42 +64,50 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
     super.dispose();
   }
 
-  /// Volta ao estado de carregamento e busca tudo de novo.
+  /// Volta ao estado de carregamento e busca o histórico de novo.
   Future<void> _reload() {
     setState(() {
       _loading = true;
       _error = null;
     });
-    return _load();
+    return _loadHistory();
   }
 
-  /// Carrega o filamento (saldo) e a primeira página do histórico.
-  Future<void> _load() async {
+  /// Primeira página do histórico, com o filtro atual.
+  Future<void> _loadHistory() async {
+    final request = ++_request;
     try {
-      final pageFuture = _repo.stockMovements(_filament.id, type: _filter);
-      final freshFuture = _repo.filament(_filament.id);
-      await Future.wait([pageFuture, freshFuture]);
-      final page = await pageFuture;
-      final fresh = await freshFuture;
-      if (!mounted) return;
+      final page = await _repo.stockMovements(_filament.id, type: _filter);
+      if (!mounted || request != _request) return;
       setState(() {
         _movements = page.items;
         _page = page.page;
         _totalPages = page.totalPages;
-        _filament = fresh;
         _loading = false;
+        _loadingMore = false;
       });
     } on ApiError catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = e.message;
-        });
-      }
+      if (!mounted || request != _request) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    }
+  }
+
+  /// Saldo atualizado após uma movimentação. Falhar aqui não esconde o
+  /// histórico: o saldo antigo continua visível.
+  Future<void> _refreshBalance() async {
+    try {
+      final fresh = await _repo.filament(_filament.id);
+      if (mounted) setState(() => _filament = fresh);
+    } on ApiError catch (e) {
+      AppLogger.warning('Falha ao atualizar o saldo', error: e);
     }
   }
 
   Future<void> _loadMore() async {
+    final request = _request;
     setState(() => _loadingMore = true);
     try {
       final page = await _repo.stockMovements(
@@ -103,7 +115,7 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
         page: _page + 1,
         type: _filter,
       );
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         _movements = [..._movements, ...page.items];
         _page = page.page;
@@ -111,7 +123,7 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
         _loadingMore = false;
       });
     } on ApiError catch (e) {
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() => _loadingMore = false);
       Toasts.error(context, e);
     }
@@ -152,6 +164,7 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
             : null,
         note: _note.text,
       );
+      if (!mounted) return;
       _note.clear();
       setState(() {
         _grams = null;
@@ -160,11 +173,12 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
         _saving = false;
       });
       widget.onChanged();
-      if (mounted) Toasts.success(context, 'Movimentação registrada');
-      await _load();
+      Toasts.success(context, 'Movimentação registrada');
+      await Future.wait([_refreshBalance(), _reload()]);
     } on ApiError catch (e) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) Toasts.error(context, e);
+      Toasts.error(context, e);
     }
   }
 

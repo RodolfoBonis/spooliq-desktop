@@ -103,6 +103,8 @@ void main() {
     await pump(tester);
     await tester.enterText(field('Carretéis'), '3');
     await tester.pump();
+    // O campo de gramas (sem foco) mostra o resultado do cálculo.
+    expect(find.text('3000,0'), findsOneWidget);
     await tester.tap(find.text('Registrar'));
     await tester.pump(const Duration(milliseconds: 100));
 
