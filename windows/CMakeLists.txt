@@ -50,6 +50,14 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# local_auth_windows 2.0.2 compila com /await (corrotinas experimentais), que o
+# MSVC 14.5x rejeita com o erro STL1011. Enquanto o plugin não migra para o
+# <coroutine> do C++20, silencia a depreciação só nesse alvo.
+if(TARGET local_auth_windows_plugin)
+  target_compile_definitions(local_auth_windows_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
