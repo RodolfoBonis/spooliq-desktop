@@ -3,11 +3,9 @@
 #
 # Uso: scripts/build_macos_dmg.sh [--skip-build]
 #
-# O app sai com assinatura ad-hoc. Para distribuir fora da sua máquina sem
-# alerta do Gatekeeper, assine com um "Developer ID Application" e notarize:
-#   codesign --deep --force --options runtime --sign "Developer ID Application: …" SpoolIQ.app
-#   xcrun notarytool submit dist/SpoolIQ-x.y.z.dmg --keychain-profile <perfil> --wait
-#   xcrun stapler staple dist/SpoolIQ-x.y.z.dmg
+# Assinatura opcional (sem as variáveis, o app sai com assinatura ad-hoc):
+#   MACOS_SIGN_IDENTITY  "Developer ID Application: Nome (TEAMID)" (no keychain)
+#   APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD  notarização (app-specific password)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -26,9 +24,26 @@ OUT="dist/SpoolIQ-${VERSION}.dmg"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
+if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
+  # Hardened runtime + entitlements de release: exigências da notarização.
+  codesign --force --deep --options runtime --timestamp \
+    --entitlements macos/Runner/Release.entitlements \
+    --sign "$MACOS_SIGN_IDENTITY" "$APP"
+  codesign --verify --strict --verbose=2 "$APP"
+fi
+
 mkdir -p dist
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 rm -f "$OUT"
 hdiutil create -volname "SpoolIQ" -srcfolder "$STAGE" -ov -format UDZO "$OUT" >/dev/null
+
+if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
+  codesign --force --timestamp --sign "$MACOS_SIGN_IDENTITY" "$OUT"
+  if [[ -n "${APPLE_ID:-}" && -n "${APPLE_TEAM_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" ]]; then
+    xcrun notarytool submit "$OUT" --wait \
+      --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+    xcrun stapler staple "$OUT"
+  fi
+fi
 echo "✓ $OUT ($(du -h "$OUT" | cut -f1))"
