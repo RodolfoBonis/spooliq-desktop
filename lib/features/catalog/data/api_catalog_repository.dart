@@ -99,10 +99,15 @@ class ApiCatalogRepository implements CatalogRepository {
   Future<Paginated<StockMovement>> stockMovements(
     String filamentId, {
     int page = 1,
+    StockMovementType? type,
   }) async => Paginated.fromJson(
     await _api.get(
       '/filaments/$filamentId/stock-movements',
-      query: {'page': page, 'page_size': 50},
+      query: {
+        'page': page,
+        'page_size': 50,
+        if (type != null) 'type': type.value,
+      },
     ),
     StockMovement.fromJson,
   );
