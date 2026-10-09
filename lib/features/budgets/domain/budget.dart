@@ -123,9 +123,14 @@ class BudgetItem extends Equatable {
     this.costPreset,
     this.notes,
     this.model3dId,
+    this.isLegacy = false,
   });
 
   factory BudgetItem.fromJson(Json json) => BudgetItem(
+    // Itens anteriores ao breakdown de mão de obra não trazem estes campos.
+    isLegacy:
+        !json.containsKey('setup_time_minutes') ||
+        !json.containsKey('manual_labor_minutes_total'),
     id: json.str('id'),
     productName: json.str('product_name'),
     description: json.strOrNull('product_description'),
@@ -168,6 +173,9 @@ class BudgetItem extends Equatable {
   final NamedRef? costPreset;
   final String? notes;
   final String? model3dId;
+
+  /// Calculado pelo modelo de custos antigo (sem breakdown de mão de obra).
+  final bool isLegacy;
   final CostLines costs;
   final int totalCostCents;
   final int unitCostCents;
@@ -503,6 +511,10 @@ class Budget extends Equatable {
   String get customerName => customer?.name ?? '';
 
   bool get isShared => publicToken != null;
+
+  /// Algum item usa o cálculo antigo: vale recalcular (ou duplicar e
+  /// recalcular, se já não for rascunho).
+  bool get usesLegacyCalculation => items.any((i) => i.isLegacy);
 
   bool get isExpiringSoon {
     final v = validUntil;

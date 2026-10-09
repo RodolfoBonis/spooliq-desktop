@@ -103,6 +103,9 @@ abstract interface class BudgetRepository {
 
   Future<Budget> duplicate(String id);
 
+  /// Recalcula os custos com os preços/presets atuais (só rascunhos).
+  Future<Budget> recalculate(String id);
+
   Future<void> delete(String id);
 
   Future<BudgetShare> share(String id);

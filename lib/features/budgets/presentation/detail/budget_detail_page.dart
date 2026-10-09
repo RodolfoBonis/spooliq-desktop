@@ -142,7 +142,7 @@ class _DetailView extends StatelessWidget {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 1100;
-          final main = _MainColumn(budget: budget);
+          final main = _MainColumn(budget: budget, actions: actions);
           final side = _SideColumn(budget: budget, history: history);
           if (!wide) {
             return Column(
@@ -177,9 +177,10 @@ class _DetailView extends StatelessWidget {
 }
 
 class _MainColumn extends StatelessWidget {
-  const _MainColumn({required this.budget});
+  const _MainColumn({required this.budget, required this.actions});
 
   final Budget budget;
+  final BudgetActions actions;
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +191,10 @@ class _MainColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (b.usesLegacyCalculation) ...[
+          _LegacyCalculation(budget: b, actions: actions),
+          const SizedBox(height: 16),
+        ],
         if (b.stockWarnings.isNotEmpty) ...[
           _StockWarnings(warnings: b.stockWarnings),
           const SizedBox(height: 16),
@@ -648,6 +653,66 @@ class _StockWarnings extends StatelessWidget {
                     style: typo.body13.copyWith(color: ext.warningText),
                   ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Orçamento criado antes do breakdown de mão de obra: os custos podem não
+/// refletir o modelo atual.
+class _LegacyCalculation extends StatelessWidget {
+  const _LegacyCalculation({required this.budget, required this.actions});
+
+  final Budget budget;
+  final BudgetActions actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final draft = budget.status.isEditable;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ext.infoSurface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_toggle_off_rounded, size: 18, color: ext.infoText),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Este orçamento usa o cálculo antigo',
+                  style: typo.body14Medium.copyWith(color: ext.infoText),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  draft
+                      ? 'Recalcule para usar o modelo de custos atual, com '
+                            'mão de obra detalhada.'
+                      : 'Crie uma cópia recalculada para usar o modelo de '
+                            'custos atual, com mão de obra detalhada.',
+                  style: typo.body13.copyWith(color: ext.infoText),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FormaButton.secondary(
+            label: draft ? 'Recalcular' : 'Duplicar e recalcular',
+            small: true,
+            icon: const Icon(Icons.calculate_outlined, size: 16),
+            onPressed: () => unawaited(
+              draft
+                  ? actions.recalculate(budget)
+                  : actions.duplicateAndRecalculate(budget),
             ),
           ),
         ],
