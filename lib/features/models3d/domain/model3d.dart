@@ -175,9 +175,11 @@ class SliceAnalysis extends Equatable {
 }
 
 abstract interface class Model3DRepository {
+  /// [format] é a extensão sem ponto (`stl`, `3mf`).
   Future<Paginated<Model3D>> list({
     PageQuery page = const PageQuery(),
     String? customerId,
+    String? format,
   });
   Future<Model3D> upload({
     required String filePath,

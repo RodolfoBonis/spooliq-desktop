@@ -22,28 +22,44 @@ import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/models3d/presentation/slice_analysis_view.dart';
 import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
 
-class ModelsPage extends StatelessWidget {
+class ModelsPage extends StatefulWidget {
   const ModelsPage({super.key});
+
+  @override
+  State<ModelsPage> createState() => _ModelsPageState();
+}
+
+class _ModelsPageState extends State<ModelsPage> {
+  /// Filtro de formato (`stl` / `3mf`), lido a cada busca do cubit.
+  final _format = ValueNotifier<String?>(null);
+
+  @override
+  void dispose() {
+    _format.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) {
         final cubit = PagedListCubit<Model3D>(
-          (q) => di<Model3DRepository>().list(page: q),
+          (q) => di<Model3DRepository>().list(page: q, format: _format.value),
           idOf: (m) => m.id,
           initialQuery: const PageQuery(sortBy: 'created_at'),
         );
         unawaited(cubit.load());
         return cubit;
       },
-      child: const _ModelsView(),
+      child: _ModelsView(format: _format),
     );
   }
 }
 
 class _ModelsView extends StatelessWidget {
-  const _ModelsView();
+  const _ModelsView({required this.format});
+
+  final ValueNotifier<String?> format;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +82,31 @@ class _ModelsView extends StatelessWidget {
           onPressed: () => unawaited(_upload(context)),
         ),
       ],
-      toolbar: SearchField(hint: 'Buscar modelos…', onChanged: cubit.search),
+      toolbar: Row(
+        children: [
+          SearchField(hint: 'Buscar modelos…', onChanged: cubit.search),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 170,
+            child: ValueListenableBuilder<String?>(
+              valueListenable: format,
+              builder: (context, value, _) => FormaSelect<String>(
+                hint: 'Todos os formatos',
+                clearable: true,
+                value: value,
+                options: const [
+                  FormaSelectOption(value: 'stl', label: 'STL'),
+                  FormaSelectOption(value: '3mf', label: '3MF'),
+                ],
+                onChanged: (v) {
+                  format.value = v;
+                  unawaited(cubit.load(cubit.state.query.copyWith(page: 1)));
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
       body: PagedTable<Model3D>(
         itemLabel: 'modelos',
         onRowTap: (m) => unawaited(_details(context, m)),
