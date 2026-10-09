@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_client.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
@@ -20,17 +22,22 @@ class ApiBudgetRepository implements BudgetRepository {
   }) async {
     final body = await _api.get(
       '/budgets',
-      query: {
-        ...page.toQuery(),
-        if (filter.search != null) 'q': filter.search,
-        'status': filter.status?.value,
-        'customer_id': filter.customerId,
-        if (filter.from != null) 'from': Fmt.apiDate(filter.from!),
-        if (filter.to != null) 'to': Fmt.apiDate(filter.to!),
-      },
+      query: {...page.toQuery(), ..._filterQuery(filter)},
     );
     return Paginated.fromJson(body, Budget.fromJson);
   }
+
+  @override
+  Future<Uint8List> exportCsv(BudgetFilter filter) =>
+      _api.download('/budgets/export.csv', query: _filterQuery(filter));
+
+  static Map<String, dynamic> _filterQuery(BudgetFilter filter) => {
+    if (filter.search != null) 'q': filter.search,
+    'status': filter.status?.value,
+    'customer_id': filter.customerId,
+    if (filter.from != null) 'from': Fmt.apiDate(filter.from!),
+    if (filter.to != null) 'to': Fmt.apiDate(filter.to!),
+  };
 
   @override
   Future<Budget> get(String id) async =>

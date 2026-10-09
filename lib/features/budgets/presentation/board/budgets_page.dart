@@ -8,12 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
+import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/core/ui/paged_table.dart';
+import 'package:spooliq_desktop/core/ui/save_file.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
@@ -75,6 +77,21 @@ class _BudgetsPageState extends State<BudgetsPage> {
     unawaited(_reload());
   }
 
+  Future<void> _exportCsv() async {
+    try {
+      final bytes = await di<BudgetRepository>().exportCsv(_filter);
+      final path = await saveBytesAs(
+        bytes,
+        suggestedName: 'orcamentos.csv',
+        typeLabel: 'Planilha CSV',
+        extension: 'csv',
+      );
+      if (path != null && mounted) Toasts.success(context, 'CSV exportado');
+    } on ApiError catch (e) {
+      if (mounted) Toasts.error(context, e);
+    }
+  }
+
   void _setFilter(BudgetFilter filter) {
     setState(() => _filter = filter.copyWith(status: () => _tableStatus));
     unawaited(_reload());
@@ -111,6 +128,13 @@ class _BudgetsPageState extends State<BudgetsPage> {
               child: FormaIconButton(
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 onPressed: () => unawaited(_reload()),
+              ),
+            ),
+            Tooltip(
+              message: 'Exportar CSV (com os filtros atuais)',
+              child: FormaIconButton(
+                icon: const Icon(Icons.download_rounded, size: 20),
+                onPressed: () => unawaited(_exportCsv()),
               ),
             ),
             FormaButton.primary(

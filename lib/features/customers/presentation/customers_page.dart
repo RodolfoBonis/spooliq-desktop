@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
@@ -14,11 +15,13 @@ import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/core/ui/paged_table.dart';
+import 'package:spooliq_desktop/core/ui/save_file.dart';
 import 'package:spooliq_desktop/core/ui/search_field.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/customers/presentation/customer_form.dart';
+import 'package:spooliq_desktop/features/customers/presentation/customer_import_result.dart';
 
 class CustomersPage extends StatelessWidget {
   const CustomersPage({this.openCreate = false, super.key});
@@ -62,6 +65,41 @@ class _CustomersViewState extends State<_CustomersView> {
     }
   }
 
+  Future<void> _export() async {
+    final search = context.read<PagedListCubit<Customer>>().state.query.search;
+    try {
+      final bytes = await di<CustomerRepository>().exportCsv(search: search);
+      final path = await saveBytesAs(
+        bytes,
+        suggestedName: 'clientes.csv',
+        typeLabel: 'Planilha CSV',
+        extension: 'csv',
+      );
+      if (path != null && mounted) Toasts.success(context, 'CSV exportado');
+    } on ApiError catch (e) {
+      if (mounted) Toasts.error(context, e);
+    }
+  }
+
+  Future<void> _import() async {
+    final cubit = context.read<PagedListCubit<Customer>>();
+    final file = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Planilha CSV', extensions: ['csv']),
+      ],
+    );
+    if (file == null || !mounted) return;
+    Toasts.info(context, 'Importando clientes…');
+    try {
+      final result = await di<CustomerRepository>().importCsv(file.path);
+      if (!mounted) return;
+      unawaited(cubit.refresh());
+      await showCustomerImportResult(context, result);
+    } on ApiError catch (e) {
+      if (mounted) Toasts.error(context, e);
+    }
+  }
+
   Future<void> _create() async {
     final cubit = context.read<PagedListCubit<Customer>>();
     final saved = await showCustomerForm(context);
@@ -79,6 +117,9 @@ class _CustomersViewState extends State<_CustomersView> {
 
   @override
   Widget build(BuildContext context) {
+    final canImport = context.select<SessionCubit, bool>(
+      (c) => c.state.user?.canManage ?? false,
+    );
     final canDelete = context.select<SessionCubit, bool>(
       (c) => c.state.user?.canDeleteCustomers ?? false,
     );
@@ -91,6 +132,22 @@ class _CustomersViewState extends State<_CustomersView> {
       title: 'Clientes',
       subtitle: 'Quem compra de você, e quanto.',
       actions: [
+        FormaMenuButton(
+          tooltip: 'Importar / exportar',
+          items: [
+            FormaMenuItem(
+              label: 'Exportar CSV',
+              icon: Icons.download_rounded,
+              onTap: () => unawaited(_export()),
+            ),
+            if (canImport)
+              FormaMenuItem(
+                label: 'Importar CSV',
+                icon: Icons.upload_file_rounded,
+                onTap: () => unawaited(_import()),
+              ),
+          ],
+        ),
         FormaButton.primary(
           label: 'Novo cliente',
           small: true,
