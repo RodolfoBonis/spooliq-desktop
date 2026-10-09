@@ -13,6 +13,7 @@ abstract final class Routes {
   static String budgetEdit(String id) => '/budgets/$id/edit';
   static const customers = '/customers';
   static String customer(String id) => '/customers/$id';
+  static const activities = '/activities';
   static const filaments = '/catalog/filaments';
   static const materials = '/catalog/materials';
   static const brands = '/catalog/brands';
@@ -82,6 +83,13 @@ const navigation = <NavGroup>[
         label: 'Clientes',
         icon: Icons.people_alt_outlined,
         visible: _org,
+      ),
+      NavEntry(
+        path: Routes.activities,
+        label: 'Atividades',
+        icon: Icons.history_rounded,
+        visible: _org,
+        keywords: ['histórico', 'log', 'auditoria'],
       ),
     ],
   ),

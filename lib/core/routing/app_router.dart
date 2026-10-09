@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/app/shell/app_shell.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
+import 'package:spooliq_desktop/features/activity/presentation/activities_page.dart';
 import 'package:spooliq_desktop/features/admin/presentation/admin_companies_page.dart';
 import 'package:spooliq_desktop/features/admin/presentation/admin_dashboard_page.dart';
 import 'package:spooliq_desktop/features/admin/presentation/admin_plans_page.dart';
@@ -113,6 +114,7 @@ GoRouter buildRouter(SessionCubit session) {
             '/customers/:id',
             (s) => CustomerDetailPage(id: s.pathParameters['id']!),
           ),
+          page(Routes.activities, (_) => const ActivitiesPage()),
           page(
             Routes.filaments,
             (s) => FilamentsPage(

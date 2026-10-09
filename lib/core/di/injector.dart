@@ -4,6 +4,8 @@ import 'package:spooliq_desktop/core/auth/token_store.dart';
 import 'package:spooliq_desktop/core/config/app_config.dart';
 import 'package:spooliq_desktop/core/network/api_client.dart';
 import 'package:spooliq_desktop/core/network/session_events.dart';
+import 'package:spooliq_desktop/features/activity/data/api_activity_repository.dart';
+import 'package:spooliq_desktop/features/activity/domain/activity_repository.dart';
 import 'package:spooliq_desktop/features/admin/data/api_admin_repository.dart';
 import 'package:spooliq_desktop/features/admin/domain/admin.dart';
 import 'package:spooliq_desktop/features/auth/data/api_auth_repository.dart';
@@ -49,6 +51,9 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerSingleton<ApiClient>(api)
     ..registerLazySingleton<AuthRepository>(
       () => ApiAuthRepository(api: api, tokens: tokens),
+    )
+    ..registerLazySingleton<ActivityRepository>(
+      () => ApiActivityRepository(api),
     )
     ..registerLazySingleton<BudgetRepository>(() => ApiBudgetRepository(api))
     ..registerLazySingleton<CustomerRepository>(
