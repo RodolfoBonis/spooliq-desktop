@@ -52,7 +52,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  generate: true
   assets:
     - assets/brand/app_icon_1024.png
   fonts:
