@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:forma_theme_spooliq/forma_theme_spooliq.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spooliq_desktop/core/network/api_client.dart';
+import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/features/subscription/data/api_billing_repository.dart';
 import 'package:spooliq_desktop/features/subscription/domain/billing.dart';
 import 'package:spooliq_desktop/features/subscription/presentation/cancel_subscription_dialog.dart';
@@ -72,7 +73,7 @@ void main() {
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Cancelar assinatura').last);
+    await tester.tap(find.text('Confirmar cancelamento'));
     await tester.pump();
     expect(find.text('Selecione um motivo.'), findsOneWidget);
     verifyNever(
@@ -87,13 +88,37 @@ void main() {
     await tester.tap(find.text(CancelReason.tooExpensive.label).last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).last, 'caro demais');
-    await tester.tap(find.text('Cancelar assinatura').last);
+    await tester.tap(find.text('Confirmar cancelamento'));
     await tester.pumpAndSettle();
 
     verify(
       () => billing.cancel(reason: 'too_expensive', feedback: 'caro demais'),
     ).called(1);
     expect(result, isTrue);
+  });
+
+  testWidgets('shows the API error and keeps the dialog open', (
+    tester,
+  ) async {
+    when(
+      () => billing.cancel(
+        reason: any(named: 'reason'),
+        feedback: any(named: 'feedback'),
+      ),
+    ).thenThrow(const ServerError('Falha no gateway'));
+
+    await open(tester);
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Selecione'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(CancelReason.other.label).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar cancelamento'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Falha no gateway'), findsOneWidget);
+    expect(result, isNull);
   });
 
   testWidgets('keeping the subscription returns false', (tester) async {

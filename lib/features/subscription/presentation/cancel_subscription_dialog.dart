@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/features/subscription/domain/billing.dart';
 
 /// Motivos de cancelamento (mesmos valores da web).
@@ -31,6 +32,8 @@ Future<bool> showCancelSubscriptionDialog(
     context,
     title: 'Cancelar assinatura',
     width: 520,
+    // Fechar com o request em voo esconderia um cancelamento já feito.
+    barrierDismissible: false,
     child: _CancelBody(repository: repository),
   );
   return cancelled ?? false;
@@ -75,9 +78,19 @@ class _CancelBodyState extends State<_CancelBody> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ApiError catch (e) {
+      if (!mounted) return;
       setState(() {
         _saving = false;
         _error = e.message;
+      });
+    } on Object catch (e, st) {
+      unawaited(
+        AppLogger.error(e, st, reason: 'cancel_subscription'),
+      );
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = 'Não foi possível cancelar. Tente novamente.';
       });
     }
   }
@@ -127,7 +140,7 @@ class _CancelBodyState extends State<_CancelBody> {
             ),
           ];
 
-    return Column(
+    final body = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -146,11 +159,13 @@ class _CancelBodyState extends State<_CancelBody> {
             FormaButton.secondary(
               label: 'Manter assinatura',
               small: true,
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: _saving
+                  ? null
+                  : () => Navigator.of(context).pop(false),
             ),
             if (_reasonStep)
               FormaButton.danger(
-                label: 'Cancelar assinatura',
+                label: 'Confirmar cancelamento',
                 small: true,
                 isLoading: _saving,
                 onPressed: () => unawaited(_confirm()),
@@ -165,5 +180,7 @@ class _CancelBodyState extends State<_CancelBody> {
         ),
       ],
     );
+    // Esc não fecha enquanto o cancelamento está em andamento.
+    return PopScope(canPop: !_saving, child: body);
   }
 }
