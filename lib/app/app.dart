@@ -7,8 +7,11 @@ import 'package:forma_theme_spooliq/forma_theme_spooliq.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:spooliq_desktop/app/theme_mode_cubit.dart';
+import 'package:spooliq_desktop/core/config/app_config.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/routing/app_router.dart';
+import 'package:spooliq_desktop/core/update/update_checker.dart';
+import 'package:spooliq_desktop/core/update/update_cubit.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/company/presentation/current_company_cubit.dart';
 
@@ -45,6 +48,17 @@ class _SpoolIqAppState extends State<SpoolIqApp> {
         BlocProvider.value(value: _session),
         BlocProvider(create: (_) => ThemeModeCubit(di())),
         BlocProvider(create: (_) => CurrentCompanyCubit(di())),
+        BlocProvider(
+          create: (_) {
+            final config = di<AppConfig>();
+            final cubit = UpdateCubit(
+              UpdateChecker(feedUrl: config.updateFeedUrl),
+              di(),
+            );
+            if (config.checksForUpdates) cubit.start();
+            return cubit;
+          },
+        ),
       ],
       child: BlocListener<SessionCubit, SessionState>(
         listenWhen: (a, b) => a.isAuthenticated && !b.isAuthenticated,
