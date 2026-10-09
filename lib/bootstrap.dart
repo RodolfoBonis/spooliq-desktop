@@ -45,8 +45,13 @@ Future<void> bootstrap(
   Future<void> run() async => runApp(builder());
 
   if (!config.hasSentry) {
-    FlutterError.onError = (details) {
-      FlutterError.presentError(details);
+    FlutterError.onError = FlutterError.presentError;
+    // Erros assíncronos fora do framework (ex.: Futures sem await).
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FlutterError.presentError(
+        FlutterErrorDetails(exception: error, stack: stack),
+      );
+      return true;
     };
     await run();
     return;
@@ -56,6 +61,7 @@ Future<void> bootstrap(
     (o) => o
       ..dsn = config.sentryDsn
       ..environment = config.environment
+      // release = <pacote>@<versão>+<build>, preenchido pelo próprio SDK.
       ..tracesSampleRate = kReleaseMode ? 0.2 : 1.0
       ..sendDefaultPii = false
       ..attachScreenshot = false,

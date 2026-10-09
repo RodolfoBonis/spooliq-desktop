@@ -4,7 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-flutter build windows --release -t lib/main_production.dart
+# SENTRY_DSN vazio = Sentry desligado (o app só inicializa com DSN).
+flutter build windows --release -t lib/main_production.dart \
+  --dart-define=SENTRY_DSN="${SENTRY_DSN:-}"
 
 VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //; s/+.*//')
 iscc "//DAppVersion=${VERSION}" windows/installer.iss

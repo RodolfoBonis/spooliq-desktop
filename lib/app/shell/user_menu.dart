@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spooliq_desktop/app/shell/about_dialog.dart';
 import 'package:spooliq_desktop/app/theme_mode_cubit.dart';
 import 'package:spooliq_desktop/core/auth/permissions.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
@@ -52,6 +53,11 @@ class UserMenu extends StatelessWidget {
             };
             unawaited(context.read<ThemeModeCubit>().set(next));
           },
+        ),
+        FormaMenuItem(
+          label: 'Sobre o SpoolIQ',
+          icon: Icons.info_outline,
+          onTap: () => unawaited(showAboutSpoolIQ(context)),
         ),
         const FormaMenuItem.divider(),
         FormaMenuItem(
