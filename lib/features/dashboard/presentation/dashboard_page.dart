@@ -17,6 +17,7 @@ import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
+import 'package:spooliq_desktop/features/activity/presentation/activity_tile.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_status_style.dart';
@@ -278,6 +279,10 @@ class _DashboardViewState extends State<_DashboardView> {
             const SizedBox(height: 16),
             _Card(
               title: 'Atividade recente',
+              trailing: TextButton(
+                onPressed: () => context.go(Routes.activities),
+                child: const Text('Ver tudo'),
+              ),
               child: _ActivityFeed(section: state.activity),
             ),
           ],
@@ -1227,97 +1232,12 @@ class _ActivityFeed extends StatelessWidget {
 
   final Section<List<Activity>> section;
 
-  static String _verb(String action) => switch (action) {
-    'created' => 'criou',
-    'updated' => 'atualizou',
-    'deleted' => 'excluiu',
-    'status_changed' => 'mudou o status de',
-    'approved' => 'aprovou',
-    'rejected' => 'rejeitou',
-    _ => action,
-  };
-
-  static String _noun(String entity) => switch (entity) {
-    'budget' => 'orçamento',
-    'customer' => 'cliente',
-    'filament' => 'filamento',
-    'material' => 'material',
-    'brand' => 'marca',
-    'preset' => 'preset',
-    'model3d' => 'modelo 3D',
-    'stock_movement' => 'estoque',
-    _ => entity,
-  };
-
-  static IconData _icon(String entity) => switch (entity) {
-    'budget' => Icons.request_quote_outlined,
-    'customer' => Icons.person_outline,
-    'filament' || 'stock_movement' => Icons.blur_circular_outlined,
-    'model3d' => Icons.view_in_ar_outlined,
-    _ => Icons.edit_outlined,
-  };
-
   @override
   Widget build(BuildContext context) {
-    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
-    final typo = context.formaTypography;
     return _section(context, section, (items) {
       if (items.isEmpty) return _emptyText(context, 'Nenhuma atividade ainda.');
       return Column(
-        children: [
-          for (final a in items)
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: switch (a.entityType) {
-                'budget' => () => context.go(Routes.budget(a.entityId)),
-                'customer' => () => context.go(Routes.customer(a.entityId)),
-                _ => null,
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: ext.appBackground,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _icon(a.entityType),
-                        size: 16,
-                        color: ext.textMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          text: '${_verb(a.action)} ${_noun(a.entityType)} ',
-                          style: typo.body13.copyWith(color: ext.textMuted),
-                          children: [
-                            TextSpan(
-                              text: a.entityName,
-                              style: typo.body13.copyWith(
-                                color: ext.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      Fmt.relative(a.at),
-                      style: typo.caption12.copyWith(color: ext.textHint),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
+        children: [for (final a in items) ActivityTile(a)],
       );
     });
   }
