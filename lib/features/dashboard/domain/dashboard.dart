@@ -1,6 +1,9 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
+import 'package:spooliq_desktop/features/dashboard/domain/analytics.dart';
+
+export 'analytics.dart';
 
 enum DashboardPeriod {
   d7('7d', '7 dias'),
@@ -31,6 +34,18 @@ class Overview extends Equatable {
     required this.newCustomers,
     required this.newCustomersChange,
     required this.byStatus,
+    this.netRevenueCents = 0,
+    this.netRevenueChange = 0,
+    this.profitCents = 0,
+    this.profitChange = 0,
+    this.profitRealizedCents = 0,
+    this.profitForecastCents = 0,
+    this.productionCostCents = 0,
+    this.marginPointsChange = 0,
+    this.profitPerHourCents = 0,
+    this.profitPerHourChange = 0,
+    this.printHours = 0,
+    this.sales = 0,
   });
 
   factory Overview.fromJson(Json j) => Overview(
@@ -42,7 +57,9 @@ class Overview extends Equatable {
     avgTicketChange: j.dbl('avg_ticket_change'),
     approvalRate: j.dbl('approval_rate'),
     approvalRateChange: j.dbl('approval_rate_change'),
-    profitMargin: j.dbl('avg_profit_margin'),
+    // Margem ponderada (lucro / receita líquida); cai para a antiga se a API
+    // ainda não tiver o campo novo.
+    profitMargin: j.dblOrNull('profit_margin') ?? j.dbl('avg_profit_margin'),
     profitMarginChange: j.dbl('profit_margin_change'),
     newCustomers: j.integer('new_customers'),
     newCustomersChange: j.dbl('new_customers_change'),
@@ -50,6 +67,18 @@ class Overview extends Equatable {
       for (final e in j.list('budgets_by_status', (x) => x))
         BudgetStatus.fromValue(e.str('status')): e.integer('count'),
     },
+    netRevenueCents: j.integer('net_revenue'),
+    netRevenueChange: j.dbl('net_revenue_change'),
+    profitCents: j.integer('profit'),
+    profitChange: j.dbl('profit_change'),
+    profitRealizedCents: j.integer('profit_realized'),
+    profitForecastCents: j.integer('profit_forecast'),
+    productionCostCents: j.integer('production_cost'),
+    marginPointsChange: j.dbl('profit_margin_points_change'),
+    profitPerHourCents: j.integer('profit_per_print_hour'),
+    profitPerHourChange: j.dbl('profit_per_print_hour_change'),
+    printHours: j.dbl('print_hours'),
+    sales: j.integer('sales_count'),
   );
 
   final int revenueCents;
@@ -66,6 +95,25 @@ class Overview extends Equatable {
   final double newCustomersChange;
   final Map<BudgetStatus, int> byStatus;
 
+  /// Vendas (aprovados, em impressão e concluídos) pela data de aprovação.
+  /// Receita líquida exclui imposto e frete; lucro já desconta o desconto.
+  final int netRevenueCents;
+  final double netRevenueChange;
+  final int profitCents;
+  final double profitChange;
+
+  /// Lucro de pedidos concluídos (realizado) e ainda em produção (previsto).
+  final int profitRealizedCents;
+  final int profitForecastCents;
+  final int productionCostCents;
+
+  /// Variação da margem em pontos percentuais.
+  final double marginPointsChange;
+  final int profitPerHourCents;
+  final double profitPerHourChange;
+  final double printHours;
+  final int sales;
+
   @override
   List<Object?> get props => [
     revenueCents,
@@ -73,6 +121,9 @@ class Overview extends Equatable {
     avgTicketCents,
     approvalRate,
     byStatus,
+    netRevenueCents,
+    profitCents,
+    profitMargin,
   ];
 }
 
@@ -147,33 +198,6 @@ class RankedItem extends Equatable {
   List<Object?> get props => [id, name, value, count];
 }
 
-class Goal extends Equatable {
-  const Goal({
-    required this.name,
-    required this.current,
-    required this.target,
-    required this.progress,
-    required this.unit,
-  });
-
-  factory Goal.fromJson(Json j) => Goal(
-    name: j.str('name'),
-    current: j.dbl('current'),
-    target: j.dbl('target'),
-    progress: j.dbl('progress'),
-    unit: j.str('unit'),
-  );
-
-  final String name;
-  final double current;
-  final double target;
-  final double progress;
-  final String unit;
-
-  @override
-  List<Object?> get props => [name, current, target];
-}
-
 class DashboardAlert extends Equatable {
   const DashboardAlert({
     required this.severity,
@@ -195,8 +219,9 @@ class DashboardAlert extends Equatable {
   List<Object?> get props => [severity, message];
 }
 
-class Insights extends Equatable {
-  const Insights({
+/// Indicadores operacionais (horas, recusas e composição dos custos).
+class Operations extends Equatable {
+  const Operations({
     required this.printHours,
     required this.printTimeChange,
     required this.rejectionRate,
@@ -204,9 +229,9 @@ class Insights extends Equatable {
     required this.breakdown,
   });
 
-  factory Insights.fromJson(Json j) {
+  factory Operations.fromJson(Json j) {
     final c = j.obj('cost_breakdown') ?? const <String, dynamic>{};
-    return Insights(
+    return Operations(
       printHours: j.dbl('total_print_time_hours'),
       printTimeChange: j.dbl('print_time_change'),
       rejectionRate: j.dbl('rejection_rate'),
@@ -215,8 +240,13 @@ class Insights extends Equatable {
         'Filamento': c.dbl('filament_pct'),
         'Desperdício': c.dbl('waste_pct'),
         'Energia': c.dbl('energy_pct'),
+        'Máquina': c.dbl('machine_pct'),
         'Setup': c.dbl('setup_pct'),
         'Mão de obra': c.dbl('labor_pct'),
+        'Pós-processamento': c.dbl('post_processing_pct'),
+        'Embalagem': c.dbl('packaging_pct'),
+        'Controle de qualidade': c.dbl('quality_control_pct'),
+        'Falhas': c.dbl('failure_pct'),
         'Overhead': c.dbl('overhead_pct'),
       },
     );
@@ -269,11 +299,13 @@ abstract interface class DashboardRepository {
   Future<Overview> overview(DashboardPeriod p);
   Future<List<TrendPoint>> revenueTrend(DashboardPeriod p);
   Future<List<FunnelStep>> funnel(DashboardPeriod p);
-  Future<List<RankedItem>> topCustomers(DashboardPeriod p);
-  Future<List<RankedItem>> topFilaments(DashboardPeriod p);
   Future<List<RankedItem>> topMaterials(DashboardPeriod p);
-  Future<(List<Goal>, List<DashboardAlert>)> goalsAlerts(DashboardPeriod p);
-  Future<Insights> insights(DashboardPeriod p);
+  Future<GoalsSummary> goals();
+  Future<void> saveGoals(Map<GoalMetric, double> targets);
+  Future<Operations> operations(DashboardPeriod p);
+  Future<Profitability> profitability(DashboardPeriod p);
+  Future<ResponseTimes> responseTimes(DashboardPeriod p);
+  Future<List<Insight>> insights(DashboardPeriod p);
   Future<List<RankedItem>> lowStock();
   Future<List<Activity>> recentActivity();
 }

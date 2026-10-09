@@ -13,6 +13,7 @@ import 'package:spooliq_desktop/features/admin/presentation/admin_subscriptions_
 import 'package:spooliq_desktop/features/auth/presentation/login_page.dart';
 import 'package:spooliq_desktop/features/auth/presentation/register_page.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
+import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/board/budgets_page.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/detail/budget_detail_page.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/editor/budget_editor_page.dart';
@@ -90,7 +91,17 @@ GoRouter buildRouter(SessionCubit session) {
             AppShell(location: state.matchedLocation, child: child),
         routes: [
           page(Routes.dashboard, (_) => const DashboardPage()),
-          page(Routes.budgets, (_) => const BudgetsPage()),
+          page(
+            Routes.budgets,
+            (s) => BudgetsPage(
+              // Recria a página quando o filtro da URL muda.
+              key: ValueKey(s.uri.queryParameters['status']),
+              initialStatus: switch (s.uri.queryParameters['status']) {
+                final v? => BudgetStatus.fromValue(v),
+                null => null,
+              },
+            ),
+          ),
           page(
             Routes.budgetNew,
             (s) => BudgetEditorPage(
