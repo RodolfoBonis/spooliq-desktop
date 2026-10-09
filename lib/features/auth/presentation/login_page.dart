@@ -7,6 +7,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
+import 'package:spooliq_desktop/features/account/presentation/forgot_password_dialog.dart';
 import 'package:spooliq_desktop/features/auth/presentation/auth_layout.dart';
 import 'package:spooliq_desktop/features/auth/presentation/login_cubit.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
@@ -176,8 +177,17 @@ class _LoginFormState extends State<_LoginForm> {
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => unawaited(
+                showForgotPasswordDialog(context, email: _email.text),
+              ),
+              child: const Text('Esqueci minha senha'),
+            ),
+          ),
           if (state.quickLoginLabel != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 4),
             FormaCheckbox(
               value: state.remember,
               label: 'Usar ${state.quickLoginLabel} nos próximos logins',

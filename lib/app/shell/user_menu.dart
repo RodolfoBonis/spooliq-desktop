@@ -32,6 +32,11 @@ class UserMenu extends StatelessWidget {
 
     return FormaMenuButton(
       items: [
+        FormaMenuItem(
+          label: 'Meu perfil',
+          icon: Icons.person_outline,
+          onTap: () => context.go(Routes.account),
+        ),
         if (user.canSeeCompanySettings)
           FormaMenuItem(
             label: 'Configurações da empresa',

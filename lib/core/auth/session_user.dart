@@ -29,7 +29,7 @@ enum Role {
   };
 }
 
-/// Usuário autenticado, extraído do access token (não há `/me` na API).
+/// Usuário autenticado, extraído do access token.
 class SessionUser extends Equatable {
   const SessionUser({
     required this.id,
@@ -80,6 +80,16 @@ class SessionUser extends Equatable {
   final String organizationId;
   final Set<Role> roles;
   final DateTime? expiresAt;
+
+  /// Mesmo usuário com outro nome (ex.: após editar o perfil).
+  SessionUser withName(String name) => SessionUser(
+    id: id,
+    email: email,
+    name: name,
+    organizationId: organizationId,
+    roles: roles,
+    expiresAt: expiresAt,
+  );
 
   bool has(Role role) => roles.contains(role);
   bool hasAny(Iterable<Role> any) => any.any(roles.contains);
