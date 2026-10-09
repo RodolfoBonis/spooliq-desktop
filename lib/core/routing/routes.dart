@@ -25,6 +25,7 @@ abstract final class Routes {
   static const company = '/settings/company';
   static const branding = '/settings/branding';
   static const users = '/settings/users';
+  static const account = '/account';
   static const subscription = '/settings/subscription';
   static const admin = '/admin';
   static const adminCompanies = '/admin/companies';

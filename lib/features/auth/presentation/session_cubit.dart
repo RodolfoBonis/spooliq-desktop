@@ -88,6 +88,19 @@ class SessionCubit extends Cubit<SessionState> {
     emit(const SessionState.unauthenticated());
   }
 
+  /// Reflete no shell o nome editado em "Meu perfil".
+  void renamed(String name) {
+    final current = state;
+    final user = current.user;
+    if (user == null) return;
+    emit(
+      SessionState.authenticated(
+        user.withName(name),
+        block: current.subscriptionBlock,
+      ),
+    );
+  }
+
   void clearSubscriptionBlock() {
     final user = state.user;
     if (user != null) emit(SessionState.authenticated(user));
