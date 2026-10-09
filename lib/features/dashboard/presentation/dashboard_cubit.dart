@@ -46,6 +46,20 @@ class DashboardState extends Equatable {
   final Section<List<RankedItem>> lowStock;
   final Section<List<Activity>> activity;
 
+  /// Alguma seção ainda carregando (ex.: exportar agora sairia incompleto).
+  bool get anyLoading => [
+    overview,
+    trend,
+    funnel,
+    customers,
+    filaments,
+    materials,
+    goals,
+    insights,
+    lowStock,
+    activity,
+  ].any((s) => s.loading);
+
   DashboardState copyWith({
     DashboardPeriod? period,
     Section<Overview>? overview,

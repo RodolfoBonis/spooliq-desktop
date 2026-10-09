@@ -1,14 +1,21 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
+import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
@@ -75,11 +82,62 @@ class DashboardPage extends StatelessWidget {
   }
 }
 
-class _DashboardView extends StatelessWidget {
+class _DashboardView extends StatefulWidget {
   const _DashboardView();
 
   @override
+  State<_DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<_DashboardView> {
+  final GlobalKey _captureKey = GlobalKey();
+
+  /// Durante a exportação o cabeçalho (período e data) entra na imagem.
+  bool _exporting = false;
+  DateTime? _exportedAt;
+
+  Future<void> _export(DashboardPeriod period) async {
+    final now = DateTime.now();
+    setState(() => _exportedAt = now);
+    try {
+      final location = await getSaveLocation(
+        suggestedName:
+            'dashboard-${period.value}-${DateFormat('yyyy-MM-dd').format(now)}'
+            '.png',
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'Imagem PNG', extensions: ['png']),
+        ],
+      );
+      if (location == null || !mounted) return;
+      // O diálogo do sistema nem sempre acrescenta a extensão.
+      final path = location.path.toLowerCase().endsWith('.png')
+          ? location.path
+          : '${location.path}.png';
+
+      setState(() => _exporting = true);
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = _captureKey.currentContext?.findRenderObject();
+      if (boundary is! RenderRepaintBoundary) {
+        throw StateError('Área do dashboard não encontrada para captura.');
+      }
+      final image = await boundary.toImage(pixelRatio: 2);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (png == null) throw StateError('Falha ao codificar o PNG.');
+      await File(path).writeAsBytes(png.buffer.asUint8List(), flush: true);
+      if (mounted) Toasts.success(context, 'Dashboard exportado');
+    } on Object catch (e, st) {
+      unawaited(AppLogger.error(e, st, reason: 'dashboard_export'));
+      if (mounted) Toasts.error(context, e);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
     final state = context.watch<DashboardCubit>().state;
     final cubit = context.read<DashboardCubit>();
     final name = context.select<SessionCubit, String>(
@@ -97,98 +155,134 @@ class _DashboardView extends StatelessWidget {
       subtitle:
           'Como está o seu negócio nos últimos '
           '${state.period.label.toLowerCase()}.',
-      actions: [_PeriodPicker(value: state.period, onChanged: cubit.load)],
+      actions: [
+        _PeriodPicker(value: state.period, onChanged: cubit.load),
+        Tooltip(
+          message: 'Exportar como imagem (PNG)',
+          child: FormaIconButton(
+            icon: const Icon(Icons.ios_share_rounded, size: 18),
+            onPressed: _exporting || state.anyLoading
+                ? null
+                : () => unawaited(_export(state.period)),
+          ),
+        ),
+      ],
       scrollable: true,
-      body: LayoutBuilder(
-        builder: (context, c) {
-          final wide = c.maxWidth > 1300;
-          return Column(
+      body: RepaintBoundary(
+        key: _captureKey,
+        child: ColoredBox(
+          // Fundo opaco: sem ele o PNG sai transparente.
+          color: ext.appBackground,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Kpis(section: state.overview, insights: state.insights),
-              const SizedBox(height: 16),
-              _row(wide, [
-                (
-                  3,
-                  _Card(
-                    title: 'Receita, custo e lucro',
-                    child: _TrendChart(section: state.trend),
+              if (_exporting)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'SpoolIQ · últimos ${state.period.label.toLowerCase()} · '
+                    'gerado em ${Fmt.dateTime(_exportedAt)}',
+                    style: typo.body14Medium.copyWith(color: ext.textMuted),
                   ),
                 ),
-                (
-                  2,
-                  _Card(
-                    title: 'Funil de conversão',
-                    child: _Funnel(section: state.funnel),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              _row(wide, [
-                (
-                  1,
-                  _Card(
-                    title: 'Melhores clientes',
-                    child: _Ranked(
-                      section: state.customers,
-                      money: true,
-                      onTap: (id) => context.go(Routes.customer(id)),
-                    ),
-                  ),
-                ),
-                (
-                  1,
-                  _Card(
-                    title: 'Filamentos mais usados',
-                    child: _Ranked(section: state.filaments, swatch: true),
-                  ),
-                ),
-                (
-                  1,
-                  _Card(
-                    title: 'Materiais',
-                    child: _Materials(section: state.materials),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              _row(wide, [
-                (
-                  1,
-                  _Card(
-                    title: 'Estoque baixo',
-                    trailing: TextButton(
-                      onPressed: () =>
-                          context.go('${Routes.filaments}?low_stock=1'),
-                      child: const Text('Ver todos'),
-                    ),
-                    child: _LowStock(section: state.lowStock),
-                  ),
-                ),
-                (
-                  1,
-                  _Card(
-                    title: 'Metas e alertas',
-                    child: _Goals(section: state.goals),
-                  ),
-                ),
-                (
-                  1,
-                  _Card(
-                    title: 'Custos médios',
-                    child: _Breakdown(section: state.insights),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              _Card(
-                title: 'Atividade recente',
-                child: _ActivityFeed(section: state.activity),
-              ),
+              _body(state),
             ],
-          );
-        },
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _body(DashboardState state) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final wide = c.maxWidth > 1300;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Kpis(section: state.overview, insights: state.insights),
+            const SizedBox(height: 16),
+            _row(wide, [
+              (
+                3,
+                _Card(
+                  title: 'Receita, custo e lucro',
+                  child: _TrendChart(section: state.trend),
+                ),
+              ),
+              (
+                2,
+                _Card(
+                  title: 'Funil de conversão',
+                  child: _Funnel(section: state.funnel),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            _row(wide, [
+              (
+                1,
+                _Card(
+                  title: 'Melhores clientes',
+                  child: _Ranked(
+                    section: state.customers,
+                    money: true,
+                    onTap: (id) => context.go(Routes.customer(id)),
+                  ),
+                ),
+              ),
+              (
+                1,
+                _Card(
+                  title: 'Filamentos mais usados',
+                  child: _Ranked(section: state.filaments, swatch: true),
+                ),
+              ),
+              (
+                1,
+                _Card(
+                  title: 'Materiais',
+                  child: _Materials(section: state.materials),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            _row(wide, [
+              (
+                1,
+                _Card(
+                  title: 'Estoque baixo',
+                  trailing: TextButton(
+                    onPressed: () =>
+                        context.go('${Routes.filaments}?low_stock=1'),
+                    child: const Text('Ver todos'),
+                  ),
+                  child: _LowStock(section: state.lowStock),
+                ),
+              ),
+              (
+                1,
+                _Card(
+                  title: 'Metas e alertas',
+                  child: _Goals(section: state.goals),
+                ),
+              ),
+              (
+                1,
+                _Card(
+                  title: 'Custos médios',
+                  child: _Breakdown(section: state.insights),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 16),
+            _Card(
+              title: 'Atividade recente',
+              child: _ActivityFeed(section: state.activity),
+            ),
+          ],
+        );
+      },
     );
   }
 
