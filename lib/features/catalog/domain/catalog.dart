@@ -313,18 +313,39 @@ class StockMovement extends Equatable {
 
 /// Filtros da listagem de filamentos.
 class FilamentFilter extends Equatable {
-  const FilamentFilter({this.brandId, this.materialId, this.lowStock = false});
+  const FilamentFilter({
+    this.brandId,
+    this.materialId,
+    this.diameter,
+    this.lowStock = false,
+  });
 
   final String? brandId;
   final String? materialId;
+
+  /// Diâmetro em mm (1.75 / 2.85); null = todos.
+  final double? diameter;
   final bool lowStock;
+
+  FilamentFilter copyWith({
+    String? Function()? brandId,
+    String? Function()? materialId,
+    double? Function()? diameter,
+    bool? lowStock,
+  }) => FilamentFilter(
+    brandId: brandId != null ? brandId() : this.brandId,
+    materialId: materialId != null ? materialId() : this.materialId,
+    diameter: diameter != null ? diameter() : this.diameter,
+    lowStock: lowStock ?? this.lowStock,
+  );
 
   Map<String, dynamic> toQuery() => {
     'brand_id': brandId,
     'material_id': materialId,
+    'diameter': ?diameter,
     if (lowStock) 'low_stock': true,
   };
 
   @override
-  List<Object?> get props => [brandId, materialId, lowStock];
+  List<Object?> get props => [brandId, materialId, diameter, lowStock];
 }

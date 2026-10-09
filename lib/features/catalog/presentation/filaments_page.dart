@@ -111,13 +111,8 @@ class _FilamentsPageState extends State<FilamentsPage> {
                   for (final b in _brands)
                     FormaSelectOption(value: b.id, label: b.name),
                 ],
-                onChanged: (v) => _setFilter(
-                  FilamentFilter(
-                    brandId: v,
-                    materialId: _filter.materialId,
-                    lowStock: _filter.lowStock,
-                  ),
-                ),
+                onChanged: (v) =>
+                    _setFilter(_filter.copyWith(brandId: () => v)),
               ),
             ),
             const SizedBox(width: 10),
@@ -131,26 +126,30 @@ class _FilamentsPageState extends State<FilamentsPage> {
                   for (final m in _materials)
                     FormaSelectOption(value: m.id, label: m.name),
                 ],
-                onChanged: (v) => _setFilter(
-                  FilamentFilter(
-                    brandId: _filter.brandId,
-                    materialId: v,
-                    lowStock: _filter.lowStock,
-                  ),
-                ),
+                onChanged: (v) =>
+                    _setFilter(_filter.copyWith(materialId: () => v)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 150,
+              child: FormaSelect<double>(
+                hint: 'Todos os diâmetros',
+                clearable: true,
+                value: _filter.diameter,
+                options: const [
+                  FormaSelectOption(value: 1.75, label: '1,75 mm'),
+                  FormaSelectOption(value: 2.85, label: '2,85 mm'),
+                ],
+                onChanged: (v) =>
+                    _setFilter(_filter.copyWith(diameter: () => v)),
               ),
             ),
             const Spacer(),
             FormaCheckbox(
               value: _filter.lowStock,
               label: 'Só estoque baixo',
-              onChanged: (v) => _setFilter(
-                FilamentFilter(
-                  brandId: _filter.brandId,
-                  materialId: _filter.materialId,
-                  lowStock: v,
-                ),
-              ),
+              onChanged: (v) => _setFilter(_filter.copyWith(lowStock: v)),
             ),
           ],
         ),

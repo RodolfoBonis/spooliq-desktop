@@ -13,10 +13,16 @@ class ApiModel3DRepository implements Model3DRepository {
   Future<Paginated<Model3D>> list({
     PageQuery page = const PageQuery(),
     String? customerId,
+    String? format,
   }) async => Paginated.fromJson(
     await _api.get(
       '/models3d',
-      query: {...page.toQuery(), 'customer_id': customerId},
+      query: {
+        ...page.toQuery(),
+        'customer_id': customerId,
+        // A API espera a extensão com ponto (`.stl`, `.3mf`).
+        if (format != null) 'format': '.$format',
+      },
     ),
     Model3D.fromJson,
   );
