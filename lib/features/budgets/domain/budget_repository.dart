@@ -93,6 +93,9 @@ abstract interface class BudgetRepository {
 
   Future<Budget> get(String id);
 
+  /// CSV (`;`, UTF-8 com BOM) dos orçamentos que batem com [filter].
+  Future<Uint8List> exportCsv(BudgetFilter filter);
+
   Future<Budget> create(BudgetDraft draft);
 
   Future<Budget> update(String id, BudgetDraft draft);

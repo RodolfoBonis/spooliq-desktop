@@ -151,10 +151,15 @@ class ApiClient {
   }
 
   /// Baixa um arquivo absoluto (ex.: CDN) ou relativo à API.
-  Future<Uint8List> download(String urlOrPath, {bool auth = true}) async {
+  Future<Uint8List> download(
+    String urlOrPath, {
+    bool auth = true,
+    Map<String, dynamic>? query,
+  }) async {
     try {
       final res = await _dio.get<List<int>>(
         urlOrPath,
+        queryParameters: _clean(query),
         options: Options(
           responseType: ResponseType.bytes,
           extra: {if (!auth || urlOrPath.startsWith('http')) kSkipAuth: true},

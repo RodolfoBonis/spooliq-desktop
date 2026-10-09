@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:spooliq_desktop/core/network/api_client.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
@@ -37,4 +39,20 @@ class ApiCustomerRepository implements CustomerRepository {
 
   @override
   Future<void> delete(String id) => _api.delete('/customers/$id');
+
+  @override
+  Future<Uint8List> exportCsv({String? search}) => _api.download(
+    '/customers/export.csv',
+    query: {'q': search},
+  );
+
+  @override
+  Future<CustomerImportResult> importCsv(String filePath) async =>
+      CustomerImportResult.fromJson(
+        await _api.upload(
+          '/customers/import',
+          field: 'file',
+          filePath: filePath,
+        ),
+      );
 }
