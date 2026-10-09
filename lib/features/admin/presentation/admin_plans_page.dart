@@ -40,25 +40,12 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     }
   }
 
-  /// Valida os recursos na API antes de salvar o plano.
-  Future<void> _validateFeatures(List<PlanFeature> features) async {
-    if (features.isEmpty) return;
-    final result = await _repo.validateFeatures(features);
-    if (result.isValid) return;
-    throw ValidationError(
-      [
-        'Recursos inválidos:',
-        ...result.invalid,
-        if (result.suggestions.isNotEmpty)
-          'Sugestões: ${result.suggestions.join(', ')}',
-      ].join('\n'),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+    // Pré-carrega o catálogo para o editor abrir sem esperar a rede.
+    unawaited(_loadCatalog());
   }
 
   Future<void> _load() async {
@@ -373,11 +360,11 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     final description = TextEditingController(text: p?.description);
     num? price = p?.price;
     var cycle = p?.cycle ?? 'MONTHLY';
+    final catalog = await _loadCatalog();
+    if (!mounted) return;
     final features = TextEditingController(
       text: p?.features.map((f) => f.name).join('\n'),
     );
-    final catalog = await _loadCatalog();
-    if (!mounted) return;
     final saved = await showFormDialog<Plan>(
       context,
       title: p == null ? 'Novo plano' : 'Editar plano',
@@ -456,6 +443,8 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
             },
           ),
       ],
+      // Sem validação de recursos na API: ela compara com uma lista fixa de
+      // nomes técnicos e rejeitaria os recursos em texto livre já usados.
       onSubmit: () async {
         if (price == null) throw const ValidationError('Informe o preço.');
         final byName = {for (final f in catalog) f.name: f};
@@ -463,7 +452,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
           for (final line in _featureLines(features.text))
             byName[line]?.toPlanFeature() ?? PlanFeature(name: line),
         ];
-        await _validateFeatures(list);
         return _repo.savePlan(
           Plan(
             id: p?.id ?? '',

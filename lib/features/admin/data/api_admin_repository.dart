@@ -189,18 +189,6 @@ class ApiAdminRepository implements AdminRepository {
   );
 
   @override
-  Future<FeatureValidation> validateFeatures(
-    List<PlanFeature> features,
-  ) async => FeatureValidation.fromJson(
-    await _api.postJson(
-      '/admin/features/validate',
-      body: {
-        'features': [for (final f in features) f.toJson()],
-      },
-    ),
-  );
-
-  @override
   Future<Paginated<PlanAuditEntry>> planHistory(
     String id, {
     int page = 1,

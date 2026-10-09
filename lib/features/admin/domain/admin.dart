@@ -341,38 +341,6 @@ class AvailableFeature extends Equatable {
   List<Object?> get props => [name, category, isActive];
 }
 
-/// Resultado de `POST /admin/features/validate`.
-class FeatureValidation extends Equatable {
-  const FeatureValidation({
-    required this.isValid,
-    this.invalid = const [],
-    this.suggestions = const [],
-  });
-
-  factory FeatureValidation.fromJson(Json json) {
-    final j = json.unwrapData();
-    return FeatureValidation(
-      isValid: j.boolean('is_valid'),
-      invalid: j.list('invalid_features', _invalidLabel),
-      suggestions: j.strings('suggestions'),
-    );
-  }
-
-  static String _invalidLabel(Json e) {
-    final name = e.obj('feature')?.strOrNull('name') ?? '?';
-    return '$name: ${e.strOrNull('error') ?? 'inválido'}';
-  }
-
-  final bool isValid;
-
-  /// "nome: erro" para cada recurso rejeitado.
-  final List<String> invalid;
-  final List<String> suggestions;
-
-  @override
-  List<Object?> get props => [isValid, invalid, suggestions];
-}
-
 /// Entrada do histórico de alterações de um plano.
 class PlanAuditEntry extends Equatable {
   const PlanAuditEntry({
@@ -486,7 +454,6 @@ abstract interface class AdminRepository {
   Future<PlanMigration> executeMigration(String migrationId);
   Future<PlanMigration> migration(String migrationId);
   Future<List<AvailableFeature>> availableFeatures();
-  Future<FeatureValidation> validateFeatures(List<PlanFeature> features);
   Future<Paginated<PlanAuditEntry>> planHistory(String id, {int page = 1});
   Future<SubscriptionDetail> subscriptionDetail(String organizationId);
 }

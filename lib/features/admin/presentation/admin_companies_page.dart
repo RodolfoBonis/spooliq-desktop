@@ -6,6 +6,7 @@ import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/form_dialog.dart';
@@ -207,8 +208,11 @@ class _CompanySheetState extends State<_CompanySheet> {
       SubscriptionDetail? detail;
       try {
         detail = await _repo.subscriptionDetail(widget.organizationId);
-      } on ApiError {
+      } on NotFoundError {
         // Empresas sem assinatura (ex.: trial) não têm detalhe de cobrança.
+        detail = null;
+      } on ApiError catch (e) {
+        AppLogger.warning('Detalhe da assinatura indisponível', error: e);
         detail = null;
       }
       if (mounted) {
