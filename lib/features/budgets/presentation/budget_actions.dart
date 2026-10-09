@@ -177,6 +177,11 @@ class BudgetActions {
         icon: Icons.picture_as_pdf_outlined,
         onTap: () => unawaited(openPdf(b)),
       ),
+      FormaMenuItem(
+        label: 'Regenerar PDF',
+        icon: Icons.refresh_rounded,
+        onTap: () => unawaited(openPdf(b, force: true)),
+      ),
       if (b.status.isShareable)
         FormaMenuItem(
           label: b.isShared
@@ -184,6 +189,12 @@ class BudgetActions {
               : 'Compartilhar com o cliente',
           icon: Icons.ios_share_rounded,
           onTap: () => unawaited(share(b)),
+        ),
+      if (b.status.isEditable)
+        FormaMenuItem(
+          label: 'Recalcular custos',
+          icon: Icons.calculate_outlined,
+          onTap: () => unawaited(recalculate(b)),
         ),
       FormaMenuItem(
         label: 'Duplicar',
@@ -239,6 +250,65 @@ class BudgetActions {
     } on ApiError catch (e) {
       if (context.mounted) Toasts.error(context, e);
     }
+  }
+
+  /// Recalcula com os preços e presets atuais (só rascunhos).
+  Future<void> recalculate(Budget b) async {
+    try {
+      final updated = await _repo.recalculate(b.id);
+      onChanged(updated);
+      if (!context.mounted) return;
+      final before = Fmt.cents(b.totalCents);
+      final after = Fmt.cents(updated.totalCents);
+      Toasts.success(
+        context,
+        before == after ? 'Custos recalculados' : 'Total: $before → $after',
+      );
+    } on ApiError catch (e) {
+      if (context.mounted) Toasts.error(context, e);
+    } on Object catch (e, st) {
+      _unexpected(e, st, 'recalculate');
+    }
+  }
+
+  /// Para orçamentos que já saíram de rascunho: cria uma cópia (rascunho)
+  /// recalculada e abre ela.
+  Future<void> duplicateAndRecalculate(Budget b) async {
+    final Budget copy;
+    try {
+      copy = await _repo.duplicate(b.id);
+      onChanged(copy);
+    } on ApiError catch (e) {
+      if (context.mounted) Toasts.error(context, e);
+      return;
+    } on Object catch (e, st) {
+      _unexpected(e, st, 'duplicate_recalculate');
+      return;
+    }
+    try {
+      final updated = await _repo.recalculate(copy.id);
+      onChanged(updated);
+      if (!context.mounted) return;
+      Toasts.success(context, 'Cópia recalculada criada');
+      context.go(Routes.budget(updated.id));
+    } on Object catch (e, st) {
+      // A cópia existe: avisa e deixa abrir para recalcular de lá.
+      if (e is! ApiError) _unexpected(e, st, 'duplicate_recalculate');
+      if (!context.mounted) return;
+      FormaToast.show(
+        context,
+        message: 'Cópia criada, mas o recálculo falhou',
+        description: e is ApiError ? e.message : null,
+        variant: FormaToastVariant.warning,
+        actionLabel: 'Abrir',
+        onAction: () => context.go(Routes.budget(copy.id)),
+      );
+    }
+  }
+
+  void _unexpected(Object e, StackTrace st, String reason) {
+    unawaited(AppLogger.error(e, st, reason: reason, category: 'budgets'));
+    if (context.mounted) Toasts.error(context, e);
   }
 
   Future<void> delete(Budget b) async {

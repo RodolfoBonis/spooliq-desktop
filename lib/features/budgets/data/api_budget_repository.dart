@@ -71,6 +71,10 @@ class ApiBudgetRepository implements BudgetRepository {
       Budget.fromJson(await _api.postJson('/budgets/$id/duplicate'));
 
   @override
+  Future<Budget> recalculate(String id) async =>
+      Budget.fromJson(await _api.postJson('/budgets/$id/recalculate'));
+
+  @override
   Future<void> delete(String id) => _api.delete('/budgets/$id');
 
   @override

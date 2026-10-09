@@ -87,6 +87,28 @@ void main() {
       expect(b.stockWarnings.single.requiredGrams, 600);
     });
 
+    test('current items are not legacy', () {
+      expect(b.usesLegacyCalculation, isFalse);
+    });
+
+    for (final missing in [
+      'setup_time_minutes',
+      'manual_labor_minutes_total',
+    ]) {
+      test('items without $missing use the old calculation', () {
+        final json = budgetJson();
+        final item = Map<String, dynamic>.of(
+          (json['items']! as List).single as Map<String, dynamic>,
+        )..remove(missing);
+        final legacy = Budget.fromJson({
+          ...json,
+          'items': [item],
+        });
+        expect(legacy.items.single.isLegacy, isTrue);
+        expect(legacy.usesLegacyCalculation, isTrue);
+      });
+    }
+
     test('copyWithStatus keeps everything else', () {
       final moved = b.copyWithStatus(BudgetStatus.sent);
       expect(moved.status, BudgetStatus.sent);
