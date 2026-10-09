@@ -15,7 +15,9 @@ FLUTTER="flutter"
 command -v fvm >/dev/null 2>&1 && FLUTTER="fvm flutter"
 
 if [[ "${1:-}" != "--skip-build" ]]; then
-  $FLUTTER build macos --release --flavor production -t lib/main_production.dart
+  # SENTRY_DSN vazio = Sentry desligado (o app só inicializa com DSN).
+  $FLUTTER build macos --release --flavor production -t lib/main_production.dart \
+    --dart-define=SENTRY_DSN="${SENTRY_DSN:-}"
 fi
 
 APP="build/macos/Build/Products/Release-production/SpoolIQ.app"
