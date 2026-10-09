@@ -8,6 +8,7 @@ import 'package:spooliq_desktop/app/theme_mode_cubit.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/network/network_status.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
 import 'package:spooliq_desktop/core/routing/app_router.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
@@ -68,7 +69,8 @@ void main() {
       ..registerSingleton<PresetRepository>(presets)
       ..registerSingleton<CompanyRepository>(company)
       ..registerSingleton<CustomerRepository>(customers)
-      ..registerSingleton<DashboardRepository>(_OfflineDashboard());
+      ..registerSingleton<DashboardRepository>(_OfflineDashboard())
+      ..registerSingleton<NetworkStatus>(NetworkStatus());
   });
 
   testWidgets('can type in the project name field', (tester) async {

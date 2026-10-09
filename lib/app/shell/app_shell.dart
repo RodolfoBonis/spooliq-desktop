@@ -6,11 +6,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/app/shell/command_palette.dart';
+import 'package:spooliq_desktop/app/shell/offline_banner.dart';
 import 'package:spooliq_desktop/app/shell/subscription_banner.dart';
 import 'package:spooliq_desktop/app/shell/update_banner.dart';
 import 'package:spooliq_desktop/app/shell/user_menu.dart';
 import 'package:spooliq_desktop/app/theme_mode_cubit.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
+import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/network/api_client.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/company/domain/company.dart';
@@ -109,6 +112,10 @@ class _AppShellState extends State<AppShell> {
                             : null,
                       ),
                       const UpdateBanner(),
+                      OfflineBanner(
+                        status: di(),
+                        ping: () => di<ApiClient>().ping(),
+                      ),
                       const SubscriptionBanner(),
                       Expanded(child: widget.child),
                     ],
