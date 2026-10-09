@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spooliq_desktop/core/auth/token_store.dart';
 import 'package:spooliq_desktop/core/config/app_config.dart';
 import 'package:spooliq_desktop/core/network/api_client.dart';
+import 'package:spooliq_desktop/core/network/network_status.dart';
 import 'package:spooliq_desktop/core/network/session_events.dart';
 import 'package:spooliq_desktop/features/activity/data/api_activity_repository.dart';
 import 'package:spooliq_desktop/features/activity/domain/activity_repository.dart';
@@ -37,10 +38,12 @@ Future<void> configureDependencies(AppConfig config) async {
   final prefs = await SharedPreferences.getInstance();
   final tokens = SecureTokenStore();
   final events = SessionEvents();
+  final network = NetworkStatus();
   final api = ApiClient(
     baseUrl: config.apiBaseUrl,
     tokens: tokens,
     events: events,
+    status: network,
   );
 
   di
@@ -48,6 +51,7 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerSingleton<SharedPreferences>(prefs)
     ..registerSingleton<TokenStore>(tokens)
     ..registerSingleton<SessionEvents>(events)
+    ..registerSingleton<NetworkStatus>(network)
     ..registerSingleton<ApiClient>(api)
     ..registerLazySingleton<AuthRepository>(
       () => ApiAuthRepository(api: api, tokens: tokens),

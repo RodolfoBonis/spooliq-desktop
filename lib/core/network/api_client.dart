@@ -7,6 +7,7 @@ import 'package:spooliq_desktop/core/auth/token_store.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/auth_interceptor.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
+import 'package:spooliq_desktop/core/network/network_status.dart';
 import 'package:spooliq_desktop/core/network/session_events.dart';
 import 'package:spooliq_desktop/core/observability/app_logger.dart';
 
@@ -26,8 +27,10 @@ class ApiClient {
     required String baseUrl,
     required TokenStore tokens,
     required SessionEvents events,
+    NetworkStatus? status,
     Dio? dio,
-  }) : _dio = dio ?? Dio() {
+  }) : _dio = dio ?? Dio(),
+       status = status ?? NetworkStatus() {
     _dio.options = _dio.options.copyWith(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 15),
@@ -35,19 +38,27 @@ class ApiClient {
       headers: {'Accept': 'application/json'},
     );
     final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
-    _dio.interceptors.add(
-      AuthInterceptor(
-        tokens: tokens,
-        events: events,
-        refreshDio: refreshDio,
-        retryDio: _dio,
-      ),
-    );
+    _dio.interceptors
+      ..add(ResilienceInterceptor(status: this.status, retryDio: _dio))
+      ..add(
+        AuthInterceptor(
+          tokens: tokens,
+          events: events,
+          refreshDio: refreshDio,
+          retryDio: _dio,
+        ),
+      );
   }
 
   final Dio _dio;
 
+  /// Online/offline conforme as últimas requisições.
+  final NetworkStatus status;
+
   Dio get dio => _dio;
+
+  /// Checagem leve de conectividade (sem autenticação).
+  Future<void> ping() => get('/health/live', auth: false);
 
   Future<Object?> get(
     String path, {
