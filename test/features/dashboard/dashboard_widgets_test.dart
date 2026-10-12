@@ -88,6 +88,27 @@ void main() {
     expect(opened, 1);
   });
 
+  testWidgets('the goals action is hidden without permission', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const InsightsPanel(
+        section: Section.data([
+          Insight(
+            kind: 'goal_off_pace',
+            severity: InsightSeverity.warning,
+            title: 'Meta fora do ritmo',
+            detail: 'd',
+            action: InsightAction(label: 'Ver metas', target: 'goals'),
+          ),
+        ]),
+      ),
+    );
+    expect(find.text('Meta fora do ritmo'), findsOneWidget);
+    expect(find.text('Ver metas'), findsNothing);
+  });
+
   testWidgets('no insights shows the all-clear message', (tester) async {
     await pump(
       tester,
@@ -114,6 +135,18 @@ void main() {
     expect(find.textContaining('10 dias restantes'), findsOneWidget);
   });
 
+  testWidgets('goals cannot be edited before they load', (tester) async {
+    await pump(
+      tester,
+      GoalsCard(
+        section: const Section.error('falhou'),
+        canManage: true,
+        onEdit: () {},
+      ),
+    );
+    expect(find.text('Definir metas'), findsNothing);
+  });
+
   testWidgets('users without permission cannot define goals', (tester) async {
     await pump(
       tester,
@@ -134,7 +167,26 @@ void main() {
       tester,
       Builder(
         builder: (context) => TextButton(
-          onPressed: () => openGoalsDialog(context),
+          onPressed: () => showGoalsDialog(
+            context,
+            const GoalsSummary(
+              goals: [
+                Goal(
+                  metric: GoalMetric.revenue,
+                  configured: true,
+                  current: 0,
+                  target: 1000000,
+                  progress: 0,
+                  projected: 0,
+                  projectedProgress: 0,
+                  requiredPerDay: 0,
+                  daysLeft: 10,
+                ),
+              ],
+              alerts: [],
+              month: '2026-10',
+            ),
+          ),
           child: const Text('abrir'),
         ),
       ),
@@ -159,7 +211,7 @@ void main() {
     final saved =
         verify(() => repo.saveGoals(captureAny())).captured.single
             as Map<GoalMetric, double>;
-    expect(saved[GoalMetric.profit], 500000);
-    expect(saved[GoalMetric.revenue], 0);
+    // Só a métrica editada vai para a API: a meta de receita existente fica.
+    expect(saved, {GoalMetric.profit: 500000});
   });
 }

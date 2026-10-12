@@ -213,7 +213,7 @@ class _DashboardViewState extends State<_DashboardView> {
             const SizedBox(height: 16),
             InsightsPanel(
               section: state.insights,
-              onOpenGoals: () => openGoalsDialog(context),
+              onOpenGoals: canManage ? () => openGoalsDialog(context) : null,
             ),
             const SizedBox(height: 16),
             _row(wide, [
@@ -616,6 +616,10 @@ class _TrendChart extends StatelessWidget {
       final maxY = points
           .expand((p) => [p.revenueCents, p.costCents, p.profitCents])
           .fold<int>(0, (m, v) => v > m ? v : m);
+      // Lucro pode ser negativo (margem abaixo do custo).
+      final minY = points
+          .map((p) => p.profitCents)
+          .fold<int>(0, (m, v) => v < m ? v : m);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -644,7 +648,7 @@ class _TrendChart extends StatelessWidget {
             height: 240,
             child: LineChart(
               LineChartData(
-                minY: 0,
+                minY: minY == 0 ? 0 : minY * 1.15,
                 maxY: maxY == 0 ? 100 : maxY * 1.15,
                 gridData: FlGridData(
                   drawVerticalLine: false,

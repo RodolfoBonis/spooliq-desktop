@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
+import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 import 'package:spooliq_desktop/features/dashboard/domain/dashboard.dart';
 import 'package:spooliq_desktop/features/dashboard/presentation/dashboard_cubit.dart';
 import 'package:spooliq_desktop/features/dashboard/presentation/widgets/goals_card.dart';
@@ -61,6 +62,7 @@ void main() {
             'days_left': 10,
           },
           {'metric': 'budgets', 'configured': false},
+          {'metric': 'margin_per_kg', 'configured': true, 'target': 1},
         ],
         'alerts': <Object>[],
       });
@@ -69,6 +71,7 @@ void main() {
       expect(profit.requiredPerDay, 8000);
       expect(s.of(GoalMetric.budgets)!.configured, isFalse);
       expect(s.of(GoalMetric.revenue), isNull);
+      expect(s.goals, hasLength(2), reason: 'unknown metrics are dropped');
     });
 
     test('profitability, response times and insights', () {
@@ -149,7 +152,7 @@ void main() {
       );
     });
 
-    test('goal form values become API targets (cents, empty removes)', () {
+    test('goal form values become API targets (cents)', () {
       expect(
         goalTargetsFromInput({
           GoalMetric.revenue: 1234.56,
@@ -159,11 +162,34 @@ void main() {
         }),
         {
           GoalMetric.revenue: 123456,
-          GoalMetric.profit: 0,
           GoalMetric.budgets: 12,
           GoalMetric.approvalRate: 55.5,
         },
       );
+    });
+
+    test('only changed goals are sent', () {
+      expect(
+        goalTargetsFromInput(
+          {
+            GoalMetric.revenue: 1000,
+            GoalMetric.profit: null,
+            GoalMetric.budgets: 5,
+          },
+          initial: {
+            GoalMetric.revenue: 1000,
+            GoalMetric.profit: 200,
+            GoalMetric.budgets: null,
+          },
+        ),
+        {GoalMetric.profit: 0, GoalMetric.budgets: 5},
+      );
+    });
+
+    test('unknown budget status filters are ignored', () {
+      expect(BudgetStatus.tryParse('sent'), BudgetStatus.sent);
+      expect(BudgetStatus.tryParse('stale'), isNull);
+      expect(BudgetStatus.tryParse(null), isNull);
     });
 
     test('profit rows sort by the chosen column', () {

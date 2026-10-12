@@ -39,8 +39,8 @@ class Goal extends Equatable {
     required this.daysLeft,
   });
 
-  factory Goal.fromJson(Json j) => Goal(
-    metric: GoalMetric.fromValue(j.str('metric')) ?? GoalMetric.revenue,
+  factory Goal._fromJson(Json j, GoalMetric metric) => Goal(
+    metric: metric,
     configured: j.boolean('configured'),
     current: j.dbl('current'),
     target: j.dbl('target'),
@@ -50,6 +50,12 @@ class Goal extends Equatable {
     requiredPerDay: j.dbl('required_per_day'),
     daysLeft: j.integer('days_left'),
   );
+
+  /// Null para métricas que este app ainda não conhece.
+  static Goal? tryFromJson(Json j) {
+    final metric = GoalMetric.fromValue(j.str('metric'));
+    return metric == null ? null : Goal._fromJson(j, metric);
+  }
 
   final GoalMetric metric;
 
@@ -79,7 +85,7 @@ class GoalsSummary extends Equatable {
   });
 
   factory GoalsSummary.fromJson(Json j) => GoalsSummary(
-    goals: j.list('goals', Goal.fromJson),
+    goals: j.list('goals', Goal.tryFromJson).nonNulls.toList(),
     alerts: j.list('alerts', DashboardAlert.fromJson),
     month: j.str('month'),
   );

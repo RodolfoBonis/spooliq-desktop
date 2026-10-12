@@ -10,6 +10,7 @@ import 'package:spooliq_desktop/features/dashboard/presentation/widgets/dashboar
 /// Horas em texto curto: "5 h", "1,5 dia", "12 dias".
 String formatHours(double hours) {
   if (hours <= 0) return '—';
+  if (hours < 1) return '< 1 h';
   if (hours < 24) return '${Fmt.number(hours.clamp(1, 23))} h';
   final days = hours / 24;
   final whole = (days - days.roundToDouble()).abs() < 0.05;
@@ -158,6 +159,8 @@ class _Stat extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: typo.body14Medium.copyWith(
               color: warn ? ext.warningText : ext.textPrimary,
               fontWeight: FontWeight.w700,

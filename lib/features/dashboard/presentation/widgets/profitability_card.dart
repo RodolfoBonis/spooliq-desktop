@@ -181,6 +181,8 @@ class _Table extends StatelessWidget {
                     child: Text(
                       Fmt.cents(r.revenueCents),
                       textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: typo.body13.copyWith(color: ext.textMuted),
                     ),
                   ),
@@ -189,6 +191,8 @@ class _Table extends StatelessWidget {
                     child: Text(
                       Fmt.cents(r.profitCents),
                       textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: typo.body13.copyWith(
                         color: r.profitCents < 0
                             ? ext.errorText

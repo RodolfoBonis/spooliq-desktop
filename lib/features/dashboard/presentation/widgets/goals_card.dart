@@ -38,7 +38,8 @@ class GoalsCard extends StatelessWidget {
         : 'Metas de ${_monthLabel(month)}';
     return DashCard(
       title: title,
-      trailing: canManage
+      // Só com as metas carregadas: o diálogo parte dos valores atuais.
+      trailing: canManage && section.data != null
           ? TextButton(onPressed: onEdit, child: const Text('Definir metas'))
           : null,
       child: dashSection(context, section, height: 240, (summary) {
@@ -128,10 +129,14 @@ class _GoalRow extends StatelessWidget {
                   style: typo.body13.copyWith(color: ext.textPrimary),
                 ),
               ),
-              Text(
-                '${formatGoalValue(g.metric, g.current)} de '
-                '${formatGoalValue(g.metric, g.target)}',
-                style: typo.caption12Med.copyWith(color: ext.textMuted),
+              Flexible(
+                child: Text(
+                  '${formatGoalValue(g.metric, g.current)} de '
+                  '${formatGoalValue(g.metric, g.target)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: typo.caption12Med.copyWith(color: ext.textMuted),
+                ),
               ),
             ],
           ),
@@ -156,17 +161,18 @@ class _GoalRow extends StatelessWidget {
 /// Diálogo para definir as metas mensais. Campo vazio ou zero remove a meta.
 Future<void> showGoalsDialog(
   BuildContext context,
-  GoalsSummary? current,
+  GoalsSummary current,
 ) async {
   final cubit = context.read<DashboardCubit>();
-  final values = <GoalMetric, num?>{
+  final initial = <GoalMetric, num?>{
     for (final m in GoalMetric.values)
-      m: switch (current?.of(m)) {
+      m: switch (current.of(m)) {
         final g? when g.configured =>
           m.unit == GoalUnit.cents ? g.target / 100 : g.target,
         _ => null,
       },
   };
+  final values = Map<GoalMetric, num?>.of(initial);
   final saved = await showFormDialog<bool>(
     context,
     title: 'Metas do mês',
@@ -198,7 +204,8 @@ Future<void> showGoalsDialog(
         ),
     ],
     onSubmit: () async {
-      await cubit.saveGoals(goalTargetsFromInput(values));
+      final changed = goalTargetsFromInput(values, initial: initial);
+      if (changed.isNotEmpty) await cubit.saveGoals(changed);
       return true;
     },
   );
@@ -212,17 +219,25 @@ Future<void> showGoalsDialog(
 }
 
 /// Converte os valores do formulário (reais, contagem, %) para a API
-/// (centavos, contagem, %). Vazio vira 0, que remove a meta.
-Map<GoalMetric, double> goalTargetsFromInput(Map<GoalMetric, num?> values) => {
+/// (centavos, contagem, %), enviando só as métricas alteradas em relação a
+/// [initial]. Campo esvaziado vira 0, que remove a meta.
+Map<GoalMetric, double> goalTargetsFromInput(
+  Map<GoalMetric, num?> values, {
+  Map<GoalMetric, num?> initial = const {},
+}) => {
   for (final e in values.entries)
-    e.key: switch (e.value) {
-      null => 0,
-      final v when e.key.unit == GoalUnit.cents => (v * 100).roundToDouble(),
-      final v => v.toDouble(),
-    },
+    if (e.value != initial[e.key])
+      e.key: switch (e.value) {
+        null => 0,
+        final v when e.key.unit == GoalUnit.cents => (v * 100).roundToDouble(),
+        final v => v.toDouble(),
+      },
 };
 
-/// Abre o diálogo de metas a partir de qualquer ponto do dashboard.
-void openGoalsDialog(BuildContext context) => unawaited(
-  showGoalsDialog(context, context.read<DashboardCubit>().state.goals.data),
-);
+/// Abre o diálogo de metas; não faz nada enquanto as metas não carregaram
+/// (abrir vazio e salvar apagaria as metas existentes).
+void openGoalsDialog(BuildContext context) {
+  final current = context.read<DashboardCubit>().state.goals.data;
+  if (current == null) return;
+  unawaited(showGoalsDialog(context, current));
+}

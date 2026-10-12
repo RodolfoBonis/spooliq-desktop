@@ -113,9 +113,12 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   final DashboardRepository _repo;
   int _generation = 0;
+  Future<void>? _loading;
 
-  Future<void> load([DashboardPeriod? period]) async {
-    final p = period ?? state.period;
+  Future<void> load([DashboardPeriod? period]) =>
+      _loading = _load(period ?? state.period);
+
+  Future<void> _load(DashboardPeriod p) async {
     final gen = ++_generation;
     emit(DashboardState(period: p));
     Future<void> run<T>(
@@ -148,6 +151,9 @@ class DashboardCubit extends Cubit<DashboardState> {
   /// Erros da API sobem para o diálogo mostrar.
   Future<void> saveGoals(Map<GoalMetric, double> targets) async {
     await _repo.saveGoals(targets);
+    // Uma carga em andamento pode ter lido as metas antes do PUT: espera ela
+    // terminar para o refresh abaixo ser a última escrita.
+    await _loading;
     final gen = _generation;
     final p = state.period;
     await Future.wait([

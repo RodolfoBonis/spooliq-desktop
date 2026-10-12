@@ -96,10 +96,9 @@ GoRouter buildRouter(SessionCubit session) {
             (s) => BudgetsPage(
               // Recria a página quando o filtro da URL muda.
               key: ValueKey(s.uri.queryParameters['status']),
-              initialStatus: switch (s.uri.queryParameters['status']) {
-                final v? => BudgetStatus.fromValue(v),
-                null => null,
-              },
+              initialStatus: BudgetStatus.tryParse(
+                s.uri.queryParameters['status'],
+              ),
             ),
           ),
           page(

@@ -30,12 +30,14 @@ String? insightRoute(InsightAction a) {
 class InsightsPanel extends StatelessWidget {
   const InsightsPanel({
     required this.section,
-    required this.onOpenGoals,
+    this.onOpenGoals,
     super.key,
   });
 
   final Section<List<Insight>> section;
-  final VoidCallback onOpenGoals;
+
+  /// Null quando o usuário não pode editar metas (a ação some).
+  final VoidCallback? onOpenGoals;
 
   @override
   Widget build(BuildContext context) {
@@ -76,10 +78,10 @@ class InsightsPanel extends StatelessWidget {
 }
 
 class _InsightTile extends StatelessWidget {
-  const _InsightTile({required this.insight, required this.onOpenGoals});
+  const _InsightTile({required this.insight, this.onOpenGoals});
 
   final Insight insight;
-  final VoidCallback onOpenGoals;
+  final VoidCallback? onOpenGoals;
 
   @override
   Widget build(BuildContext context) {
