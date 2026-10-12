@@ -23,6 +23,14 @@ enum BudgetStatus {
     return BudgetStatus.draft;
   }
 
+  /// Como [fromValue], mas devolve null para valores desconhecidos.
+  static BudgetStatus? tryParse(String? value) {
+    for (final s in values) {
+      if (s.value == value) return s;
+    }
+    return null;
+  }
+
   /// Transições permitidas — fonte única de verdade para o kanban e menus.
   Set<BudgetStatus> get allowedTransitions => switch (this) {
     draft => const {sent, cancelled},
