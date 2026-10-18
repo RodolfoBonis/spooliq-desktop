@@ -108,6 +108,17 @@ class _DetailView extends StatelessWidget {
             small: true,
             icon: const Icon(Icons.edit_outlined, size: 16),
             onPressed: () => context.go(Routes.budgetEdit(budget.id)),
+          )
+        else if (BudgetStatus.draft.isRevisionFrom(budget.status))
+          Tooltip(
+            message: 'A cliente pediu mudanças? Edite mantendo número e link',
+            child: FormaButton.secondary(
+              label: 'Revisar',
+              small: true,
+              icon: const Icon(Icons.edit_note_rounded, size: 16),
+              onPressed: () =>
+                  unawaited(actions.move(budget, BudgetStatus.draft)),
+            ),
           ),
         FormaButton.secondary(
           label: 'PDF',

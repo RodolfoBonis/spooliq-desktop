@@ -23,6 +23,7 @@ void main() {
         BudgetStatus.rejected,
         BudgetStatus.expired,
         BudgetStatus.cancelled,
+        BudgetStatus.draft, // revisão
       });
       expect(BudgetStatus.approved.allowedTransitions, {
         BudgetStatus.printing,
@@ -39,6 +40,18 @@ void main() {
       ]) {
         expect(s.allowedTransitions, {BudgetStatus.draft});
       }
+    });
+
+    test('sending back to draft is a revision only from sent', () {
+      expect(
+        BudgetStatus.draft.actionLabelFrom(BudgetStatus.sent),
+        'Revisar orçamento',
+      );
+      expect(
+        BudgetStatus.draft.actionLabelFrom(BudgetStatus.cancelled),
+        'Voltar para rascunho',
+      );
+      expect(BudgetStatus.draft.isRevisionFrom(BudgetStatus.rejected), isFalse);
     });
 
     test('edit/delete/share rules', () {
