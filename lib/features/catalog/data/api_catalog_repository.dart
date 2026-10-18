@@ -124,7 +124,8 @@ class ApiCatalogRepository implements CatalogRepository {
       '/filaments/$filamentId/stock-movements',
       body: compactJson({
         'type': type.value,
-        'grams': grams,
+        // Inteiro: o ledger guarda gramas inteiros (382.0 era rejeitado).
+        'grams': grams.round(),
         'unit_price_per_kg': unitPricePerKgCents,
         'note': (note == null || note.trim().isEmpty) ? null : note.trim(),
       }),
