@@ -124,6 +124,58 @@ void main() {
   );
 
   blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'import rounds up to the next minute, carrying the hour',
+    build: build,
+    act: (c) async {
+      await c.load();
+      c
+        ..updateItem(0, (i) => i.copyWith(quantity: 4))
+        ..applySlice(0, const [
+          SlicePlate(
+            index: 1,
+            name: '',
+            printSeconds: 7180, // 1h59m40s
+            estimated: false,
+            filaments: [SliceFilament(slot: 1, grams: 10)],
+            objects: [SliceObject(name: 'peca', count: 2)],
+          ),
+        ]);
+    },
+    verify: (c) {
+      final item = c.state.draft.items.single;
+      expect((item.printHours, item.printMinutes), (2, 0));
+      expect(item.unitsPerPrint, 2);
+      expect(item.quantity, 4, reason: 'a quantity already set is kept');
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'duplicating an item keeps pieces per print',
+    build: build,
+    act: (c) async {
+      await c.load();
+      c
+        ..updateItem(
+          0,
+          (_) => filled.copyWith(quantity: 25, unitsPerPrint: () => 10),
+        )
+        ..duplicateItem(0);
+    },
+    verify: (c) {
+      final copy = c.state.draft.items.last;
+      expect(copy.unitsPerPrint, 10);
+      expect(
+        (copy.toJson(2)
+          ..remove('product_name')
+          ..remove('order')),
+        (c.state.draft.items.first.toJson(1)
+          ..remove('product_name')
+          ..remove('order')),
+      );
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
     'a plain G-code import keeps total mode and the quantity',
     build: build,
     act: (c) async {

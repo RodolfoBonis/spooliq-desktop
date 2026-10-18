@@ -40,7 +40,40 @@ void main() {
     await tester.tap(find.text('Usar valores totais'));
     await tester.pump();
     expect(get().unitsPerPrint, isNull);
+    expect(get().setupMinutes, 0);
     expect(find.textContaining('Definir peças por impressão'), findsOneWidget);
+  });
+
+  testWidgets('going back to totals converts per-print values', (
+    tester,
+  ) async {
+    final get = await pump(
+      tester,
+      const BudgetItemDraft(
+        key: 0,
+        quantity: 25,
+        unitsPerPrint: 10,
+        printHours: 3,
+        printMinutes: 25,
+        setupMinutes: 15,
+      ),
+    );
+    await tester.tap(find.text('Usar valores totais'));
+    await tester.pump();
+    expect(get().printHours * 60 + get().printMinutes, 513);
+    expect(get().setupMinutes, 45);
+  });
+
+  testWidgets('clearing the pieces field keeps the previous value', (
+    tester,
+  ) async {
+    final get = await pump(
+      tester,
+      const BudgetItemDraft(key: 0, quantity: 25, unitsPerPrint: 10),
+    );
+    await tester.enterText(find.byType(TextField).first, '');
+    await tester.pump();
+    expect(get().unitsPerPrint, 10);
   });
 
   testWidgets('defining pieces keeps the current totals', (tester) async {

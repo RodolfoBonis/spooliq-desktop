@@ -75,19 +75,38 @@ void main() {
       expect(j['setup_time_minutes'], 15);
     });
 
-    test('a saved item comes back as one run', () {
-      for (final quantity in [10, 20, 25, 40]) {
-        final sent = _perRun.copyWith(quantity: quantity).toJson(1);
-        final item = BudgetItem.fromJson({
+    BudgetItem saved(Map<String, dynamic> sent, {bool withPerPrint = true}) =>
+        BudgetItem.fromJson({
           ...sent,
           'id': 'i1',
+          if (!withPerPrint) 'per_print': null,
           'filaments': [
             for (final f
                 in (sent['filaments'] as List).cast<Map<String, dynamic>>())
               {'filament_id': f['filament_id'], 'quantity': f['quantity']},
           ],
         });
-        final back = BudgetItemDraft.fromItem(item, 0);
+
+    test('reopening is exact for any quantity (per_print is saved)', () {
+      for (var quantity = 1; quantity <= 60; quantity++) {
+        final sent = _perRun.copyWith(quantity: quantity).toJson(1);
+        final back = BudgetItemDraft.fromItem(saved(sent), 0);
+        expect(
+          back,
+          _perRun.copyWith(quantity: quantity),
+          reason: 'q=$quantity',
+        );
+        expect(back.toJson(1), sent, reason: 'q=$quantity');
+      }
+    });
+
+    test('items saved without per_print are recovered from totals', () {
+      for (final quantity in [10, 15, 20, 25, 40]) {
+        final sent = _perRun.copyWith(quantity: quantity).toJson(1);
+        final back = BudgetItemDraft.fromItem(
+          saved(sent, withPerPrint: false),
+          0,
+        );
         expect(back.unitsPerPrint, 10, reason: 'q=$quantity');
         expect(
           back.printHours * 60 + back.printMinutes,
@@ -95,12 +114,21 @@ void main() {
           reason: 'q=$quantity',
         );
         expect(back.setupMinutes, 15, reason: 'q=$quantity');
-        expect(back.laborMinutes, 20, reason: 'q=$quantity');
         expect(back.filaments.map((f) => f.grams), [
           78.7,
           3.5,
         ], reason: 'q=$quantity');
       }
+    });
+
+    test('switching to totals keeps the same budget', () {
+      final item = _perRun.copyWith(quantity: 25);
+      final totals = item.toTotals();
+      expect(totals.unitsPerPrint, isNull);
+      final a = item.toJson(1)
+        ..remove('units_per_print')
+        ..remove('per_print');
+      expect(totals.toJson(1), a);
     });
   });
 

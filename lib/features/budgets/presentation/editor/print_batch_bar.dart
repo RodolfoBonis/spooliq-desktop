@@ -33,9 +33,11 @@ class PrintBatchBar extends StatelessWidget {
         child: TextButton.icon(
           // Os valores atuais passam a ser de uma impressão de `quantity`
           // peças: o total não muda até a quantidade mudar.
-          onPressed: () => onChanged(
-            (i) => i.copyWith(unitsPerPrint: () => i.quantity),
-          ),
+          onPressed: item.quantity < 1
+              ? null
+              : () => onChanged(
+                  (i) => i.copyWith(unitsPerPrint: () => i.quantity),
+                ),
           icon: const Icon(Icons.layers_outlined, size: 16),
           label: const Text(
             'O arquivo produz várias peças? Definir peças por impressão',
@@ -61,11 +63,16 @@ class PrintBatchBar extends StatelessWidget {
               min: 1,
               step: 1,
               suffixText: 'un.',
-              onChanged: (v) => onChanged(
-                (i) => i.copyWith(
-                  unitsPerPrint: () => (v ?? 1).toInt().clamp(1, 1000000),
-                ),
-              ),
+              onChanged: (v) {
+                // Campo vazio (no meio da digitação) mantém o valor anterior.
+                final units = v?.toInt();
+                if (units == null || units < 1) return;
+                onChanged(
+                  (i) => i.copyWith(
+                    unitsPerPrint: () => units.clamp(1, 1000000),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -90,9 +97,8 @@ class PrintBatchBar extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => onChanged(
-              (i) => i.copyWith(unitsPerPrint: () => null),
-            ),
+            // Converte para os totais atuais: o orçamento não muda.
+            onPressed: () => onChanged((i) => i.toTotals()),
             child: const Text('Usar valores totais'),
           ),
         ],

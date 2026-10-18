@@ -266,6 +266,8 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
       supportRemovalMinutes: source.supportRemovalMinutes,
       notes: source.notes,
       costPresetId: source.costPresetId,
+      // Sem isto, os valores de UMA impressão virariam totais na cópia.
+      unitsPerPrint: source.unitsPerPrint,
       filaments: source.filaments,
     );
     return d.copyWith(items: [...d.items]..insert(index + 1, copy));
@@ -299,6 +301,8 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
   }) {
     if (plates.isEmpty) return;
     final seconds = plates.fold<int>(0, (s, p) => s + p.printSeconds);
+    // Arredonda para cima no minuto, levando a hora junto (1h59m40s → 2h00).
+    final totalMinutes = (seconds + 59) ~/ 60;
     final bySlot = <int, SliceFilament>{};
     final grams = <int, double>{};
     for (final p in plates) {
@@ -315,8 +319,8 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
         productName: i.productName.trim().isEmpty ? productName : null,
         unitsPerPrint: () => pieces,
         quantity: pieces != null && i.quantity <= 1 ? pieces : null,
-        printHours: seconds ~/ 3600,
-        printMinutes: (seconds % 3600 + 59) ~/ 60 % 60,
+        printHours: totalMinutes ~/ 60,
+        printMinutes: totalMinutes % 60,
         filaments: [
           for (final slot in slots)
             FilamentUsageDraft(
