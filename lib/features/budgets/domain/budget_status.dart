@@ -54,7 +54,6 @@ enum BudgetStatus {
   bool get isShareable =>
       const {draft, sent, approved, rejected, expired}.contains(this);
 
-  /// Rótulo da ação que leva a este status ("Marcar como enviado"…).
   /// Rótulo da ação de levar um orçamento de [from] para este status.
   String actionLabelFrom(BudgetStatus from) =>
       isRevisionFrom(from) ? 'Revisar orçamento' : actionLabel;
@@ -63,6 +62,7 @@ enum BudgetStatus {
   /// cancelamento: mantém número e link de aprovação.
   bool isRevisionFrom(BudgetStatus from) => from == sent && this == draft;
 
+  /// Rótulo da ação que leva a este status ("Marcar como enviado"…).
   String get actionLabel => switch (this) {
     draft => 'Voltar para rascunho',
     sent => 'Marcar como enviado',

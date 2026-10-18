@@ -258,25 +258,27 @@ class BudgetActions {
     if (decision == null || !context.mounted) return;
     if (onMove != null) {
       final ok = await onMove!(b, to, decision.notes);
-      if (ok && context.mounted) {
-        Toasts.success(context, '"${b.name}" → ${to.label}');
-      }
+      if (ok && context.mounted) _afterMove(b, to);
       return;
     }
     try {
       final updated = await _repo.changeStatus(b.id, to, notes: decision.notes);
       onChanged(updated);
-      if (!context.mounted) return;
-      if (to.isRevisionFrom(b.status)) {
-        // Revisão: segue direto para a edição.
-        Toasts.success(context, 'Em revisão: edite e reenvie para a cliente');
-        context.go(Routes.budgetEdit(b.id));
-        return;
-      }
-      Toasts.success(context, '"${b.name}" → ${to.label}');
+      if (context.mounted) _afterMove(b, to);
     } on ApiError catch (e) {
       if (context.mounted) Toasts.error(context, e);
     }
+  }
+
+  /// Feedback da mudança de status. Uma revisão segue direto para a edição
+  /// (no detalhe, na tabela e no quadro).
+  void _afterMove(Budget b, BudgetStatus to) {
+    if (to.isRevisionFrom(b.status)) {
+      Toasts.success(context, 'Em revisão: edite e reenvie para a cliente');
+      context.go(Routes.budgetEdit(b.id));
+      return;
+    }
+    Toasts.success(context, '"${b.name}" → ${to.label}');
   }
 
   Future<void> duplicate(Budget b) async {
