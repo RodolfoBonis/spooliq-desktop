@@ -266,6 +266,8 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
       supportRemovalMinutes: source.supportRemovalMinutes,
       notes: source.notes,
       costPresetId: source.costPresetId,
+      // Sem isto, os valores de UMA impressão virariam totais na cópia.
+      unitsPerPrint: source.unitsPerPrint,
       filaments: source.filaments,
     );
     return d.copyWith(items: [...d.items]..insert(index + 1, copy));
@@ -288,6 +290,10 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
 
   /// Aplica placas do fatiador a um item: soma tempos e agrega gramas por
   /// slot do AMS (mesmo filamento em placas diferentes vira uma linha só).
+  ///
+  /// Quando o fatiador informa os objetos, os valores passam a ser de UMA
+  /// impressão que produz N peças ([piecesPerPrint]); a quantidade vira N se
+  /// ainda estava no padrão, e o envio escala para qualquer quantidade.
   void applySlice(
     int itemKey,
     List<SlicePlate> plates, {
@@ -295,6 +301,8 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
   }) {
     if (plates.isEmpty) return;
     final seconds = plates.fold<int>(0, (s, p) => s + p.printSeconds);
+    // Arredonda para cima no minuto, levando a hora junto (1h59m40s → 2h00).
+    final totalMinutes = (seconds + 59) ~/ 60;
     final bySlot = <int, SliceFilament>{};
     final grams = <int, double>{};
     for (final p in plates) {
@@ -304,12 +312,15 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
       }
     }
     final slots = bySlot.keys.toList()..sort();
+    final pieces = piecesPerPrint(plates);
     updateItem(
       itemKey,
       (i) => i.copyWith(
         productName: i.productName.trim().isEmpty ? productName : null,
-        printHours: seconds ~/ 3600,
-        printMinutes: (seconds % 3600 + 59) ~/ 60 % 60,
+        unitsPerPrint: () => pieces,
+        quantity: pieces != null && i.quantity <= 1 ? pieces : null,
+        printHours: totalMinutes ~/ 60,
+        printMinutes: totalMinutes % 60,
         filaments: [
           for (final slot in slots)
             FilamentUsageDraft(
@@ -329,7 +340,11 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
     AppLogger.info(
       'Fatiamento importado',
       category: 'budgets',
-      data: {'plates': plates.length, 'filaments': slots.length},
+      data: {
+        'plates': plates.length,
+        'filaments': slots.length,
+        'pieces': ?pieces,
+      },
     );
   }
 

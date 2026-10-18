@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
+import 'package:spooliq_desktop/features/budgets/domain/print_batch.dart';
 
 /// Filamento escolhido para um item. [label]/[colorHex] são só para a UI.
 class FilamentUsageDraft extends Equatable {
@@ -50,34 +51,62 @@ class BudgetItemDraft extends Equatable {
     this.costPresetId,
     this.model3dId,
     this.model3dName,
+    this.unitsPerPrint,
     this.filaments = const [],
   });
 
-  factory BudgetItemDraft.fromItem(BudgetItem item, int key) => BudgetItemDraft(
-    key: key,
-    productName: item.productName,
-    description: item.description ?? '',
-    quantity: item.quantity,
-    dimensions: item.dimensions ?? '',
-    printHours: item.printHours,
-    printMinutes: item.printMinutes,
-    setupMinutes: item.setupMinutes,
-    laborMinutes: item.laborMinutes,
-    postProcessingMinutes: item.postProcessingMinutes,
-    supportRemovalMinutes: item.supportRemovalMinutes,
-    notes: item.notes ?? '',
-    costPresetId: item.costPresetId,
-    model3dId: item.model3dId,
-    filaments: [
-      for (final f in item.filaments)
-        FilamentUsageDraft(
-          filamentId: f.filamentId,
-          grams: f.grams,
-          label: [f.name, f.color].where((s) => s.isNotEmpty).join(' · '),
-          colorHex: f.colorHex,
-        ),
-    ],
-  );
+  /// Reconstrói o item salvo. Com [BudgetItem.unitsPerPrint], a API guarda
+  /// totais; os valores de uma impressão vêm de [BudgetItem.perPrint] (exatos)
+  /// ou, em itens sem eles, são recalculados a partir dos totais.
+  factory BudgetItemDraft.fromItem(BudgetItem item, int key) {
+    final units = item.unitsPerPrint;
+    final batch = units == null || units <= 0
+        ? null
+        : PrintBatch(quantity: item.quantity, unitsPerPrint: units);
+    final saved = item.perPrint;
+    final exact =
+        batch != null &&
+        saved != null &&
+        saved.filamentGrams.length == item.filaments.length;
+    int minutes(int total) => batch?.unscaleMinutes(total) ?? total;
+    final printPerRun = exact
+        ? saved.printMinutes
+        : minutes(item.printHours * 60 + item.printMinutes);
+    return BudgetItemDraft(
+      key: key,
+      productName: item.productName,
+      description: item.description ?? '',
+      quantity: item.quantity,
+      dimensions: item.dimensions ?? '',
+      printHours: printPerRun ~/ 60,
+      printMinutes: printPerRun % 60,
+      setupMinutes: exact
+          ? saved.setupMinutes
+          : batch?.unscaleSetup(item.setupMinutes) ?? item.setupMinutes,
+      laborMinutes: exact ? saved.laborMinutes : minutes(item.laborMinutes),
+      postProcessingMinutes: exact
+          ? saved.postProcessingMinutes
+          : minutes(item.postProcessingMinutes),
+      supportRemovalMinutes: exact
+          ? saved.supportRemovalMinutes
+          : minutes(item.supportRemovalMinutes),
+      notes: item.notes ?? '',
+      costPresetId: item.costPresetId,
+      model3dId: item.model3dId,
+      unitsPerPrint: batch == null ? null : units,
+      filaments: [
+        for (final (i, f) in item.filaments.indexed)
+          FilamentUsageDraft(
+            filamentId: f.filamentId,
+            grams: exact
+                ? saved.filamentGrams[i]
+                : batch?.unscaleGrams(f.grams) ?? f.grams,
+            label: [f.name, f.color].where((s) => s.isNotEmpty).join(' · '),
+            colorHex: f.colorHex,
+          ),
+      ],
+    );
+  }
 
   /// Identidade local estável (para `ValueKey` na lista).
   final int key;
@@ -95,7 +124,37 @@ class BudgetItemDraft extends Equatable {
   final String? costPresetId;
   final String? model3dId;
   final String? model3dName;
+
+  /// Peças que uma impressão do arquivo produz. Quando definido, tempo,
+  /// gramas e minutos de trabalho deste rascunho são de UMA impressão e são
+  /// escalados para [quantity] ao enviar (ver [PrintBatch]).
+  final int? unitsPerPrint;
   final List<FilamentUsageDraft> filaments;
+
+  /// Lote para a quantidade atual; null no modo "valores totais".
+  PrintBatch? get batch => unitsPerPrint == null || unitsPerPrint! <= 0
+      ? null
+      : PrintBatch(quantity: quantity, unitsPerPrint: unitsPerPrint!);
+
+  /// Sai do modo "peças por impressão" mantendo o mesmo orçamento: os
+  /// valores de uma impressão viram os totais escalados da quantidade atual.
+  BudgetItemDraft toTotals() {
+    final b = batch;
+    if (b == null) return copyWith(unitsPerPrint: () => null);
+    final printTotal = b.scaleMinutes(printHours * 60 + printMinutes);
+    return copyWith(
+      unitsPerPrint: () => null,
+      printHours: printTotal ~/ 60,
+      printMinutes: printTotal % 60,
+      setupMinutes: b.scaleSetup(setupMinutes),
+      laborMinutes: b.scaleMinutes(laborMinutes),
+      postProcessingMinutes: b.scaleMinutes(postProcessingMinutes),
+      supportRemovalMinutes: b.scaleMinutes(supportRemovalMinutes),
+      filaments: [
+        for (final f in filaments) f.copyWith(grams: b.scaleGrams(f.grams)),
+      ],
+    );
+  }
 
   /// Pronto para o preview (o servidor rejeita itens sem filamento/nome).
   bool get isPreviewable =>
@@ -118,6 +177,7 @@ class BudgetItemDraft extends Equatable {
     String? Function()? costPresetId,
     String? Function()? model3dId,
     String? Function()? model3dName,
+    int? Function()? unitsPerPrint,
     List<FilamentUsageDraft>? filaments,
   }) => BudgetItemDraft(
     key: key,
@@ -135,32 +195,58 @@ class BudgetItemDraft extends Equatable {
     costPresetId: costPresetId == null ? this.costPresetId : costPresetId(),
     model3dId: model3dId == null ? this.model3dId : model3dId(),
     model3dName: model3dName == null ? this.model3dName : model3dName(),
+    unitsPerPrint: unitsPerPrint == null ? this.unitsPerPrint : unitsPerPrint(),
     filaments: filaments ?? this.filaments,
   );
 
-  Json toJson(int order) => compactJson({
-    'product_name': productName.trim(),
-    'product_description': _nullIfBlank(description),
-    'product_quantity': quantity,
-    'product_dimensions': _nullIfBlank(dimensions),
-    'print_time_hours': printHours,
-    'print_time_minutes': printMinutes.clamp(0, 59),
-    'setup_time_minutes': setupMinutes,
-    'manual_labor_minutes_total': laborMinutes,
-    'post_processing_minutes': postProcessingMinutes,
-    'support_removal_minutes': supportRemovalMinutes,
-    'additional_notes': _nullIfBlank(notes),
-    'cost_preset_id': costPresetId,
-    'model_3d_id': model3dId,
-    'order': order,
-    'filaments': [
-      for (final (i, f)
-          in filaments
-              .where((f) => f.filamentId.isNotEmpty && f.grams > 0)
-              .indexed)
-        {'filament_id': f.filamentId, 'quantity': f.grams, 'order': i + 1},
-    ],
-  });
+  Json toJson(int order) {
+    // Com peças por impressão, envia totais escalados para a quantidade: a API
+    // (preço, estoque, dashboard) sempre trabalha com o total do item.
+    final b = batch;
+    int minutes(int perRun) => b?.scaleMinutes(perRun) ?? perRun;
+    final printTotal = minutes(printHours * 60 + printMinutes);
+    final sent = filaments
+        .where((f) => f.filamentId.isNotEmpty && f.grams > 0)
+        .toList();
+    return compactJson({
+      'product_name': productName.trim(),
+      'product_description': _nullIfBlank(description),
+      'product_quantity': quantity,
+      'units_per_print': b == null ? null : unitsPerPrint,
+      // Valores de uma impressão, para reabrir sem desfazer arredondamentos.
+      'per_print': b == null
+          ? null
+          : PerPrintValues(
+              printMinutes: printHours * 60 + printMinutes,
+              setupMinutes: setupMinutes,
+              laborMinutes: laborMinutes,
+              postProcessingMinutes: postProcessingMinutes,
+              supportRemovalMinutes: supportRemovalMinutes,
+              filamentGrams: [for (final f in sent) f.grams],
+            ).toJson(),
+      'product_dimensions': _nullIfBlank(dimensions),
+      'print_time_hours': b == null ? printHours : printTotal ~/ 60,
+      'print_time_minutes': b == null
+          ? printMinutes.clamp(0, 59)
+          : printTotal % 60,
+      'setup_time_minutes': b?.scaleSetup(setupMinutes) ?? setupMinutes,
+      'manual_labor_minutes_total': minutes(laborMinutes),
+      'post_processing_minutes': minutes(postProcessingMinutes),
+      'support_removal_minutes': minutes(supportRemovalMinutes),
+      'additional_notes': _nullIfBlank(notes),
+      'cost_preset_id': costPresetId,
+      'model_3d_id': model3dId,
+      'order': order,
+      'filaments': [
+        for (final (i, f) in sent.indexed)
+          {
+            'filament_id': f.filamentId,
+            'quantity': b?.scaleGrams(f.grams) ?? f.grams,
+            'order': i + 1,
+          },
+      ],
+    });
+  }
 
   @override
   List<Object?> get props => [
@@ -179,6 +265,7 @@ class BudgetItemDraft extends Equatable {
     costPresetId,
     model3dId,
     model3dName,
+    unitsPerPrint,
     filaments,
   ];
 }

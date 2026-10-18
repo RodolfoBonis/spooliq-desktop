@@ -8,6 +8,7 @@ import 'package:spooliq_desktop/core/network/paginated.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_draft.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/editor/draft_text_field.dart';
+import 'package:spooliq_desktop/features/budgets/presentation/editor/print_batch_bar.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog_repository.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
@@ -49,6 +50,7 @@ class ItemEditor extends StatelessWidget {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     String? err(String f) => errors['item.$index.$f'];
+    final perRun = item.batch != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -177,6 +179,8 @@ class ItemEditor extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                PrintBatchBar(item: item, onChanged: onChanged),
                 const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +212,12 @@ class ItemEditor extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const _Subheader('Filamentos', trailing: 'na ordem do AMS'),
+                _Subheader(
+                  'Filamentos',
+                  trailing: perRun
+                      ? 'por impressão · na ordem do AMS'
+                      : 'na ordem do AMS',
+                ),
                 const SizedBox(height: 8),
                 _FilamentList(
                   filaments: item.filaments,
@@ -217,7 +226,10 @@ class ItemEditor extends StatelessWidget {
                       onChanged((i) => i.copyWith(filaments: list)),
                 ),
                 const SizedBox(height: 20),
-                const _Subheader('Tempo e mão de obra'),
+                _Subheader(
+                  'Tempo e mão de obra',
+                  trailing: perRun ? 'por impressão' : null,
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
@@ -245,7 +257,7 @@ class ItemEditor extends StatelessWidget {
                       (v) => onChanged((i) => i.copyWith(setupMinutes: v)),
                     ),
                     _num(
-                      'Mão de obra (total)',
+                      perRun ? 'Mão de obra' : 'Mão de obra (total)',
                       item.laborMinutes,
                       'min',
                       (v) => onChanged((i) => i.copyWith(laborMinutes: v)),

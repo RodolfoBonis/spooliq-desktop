@@ -98,6 +98,61 @@ class BudgetItemFilament extends Equatable {
 }
 
 /// Item (produto) do orçamento, com custos calculados pelo servidor (centavos).
+/// Valores de uma impressão do arquivo, guardados junto do item para que a
+/// reedição não dependa de desfazer o arredondamento dos totais.
+class PerPrintValues extends Equatable {
+  const PerPrintValues({
+    required this.printMinutes,
+    required this.setupMinutes,
+    required this.laborMinutes,
+    required this.postProcessingMinutes,
+    required this.supportRemovalMinutes,
+    required this.filamentGrams,
+  });
+
+  static PerPrintValues? fromJson(Json? j) => j == null
+      ? null
+      : PerPrintValues(
+          printMinutes: j.integer('print_minutes'),
+          setupMinutes: j.integer('setup_minutes'),
+          laborMinutes: j.integer('labor_minutes'),
+          postProcessingMinutes: j.integer('post_processing_minutes'),
+          supportRemovalMinutes: j.integer('support_removal_minutes'),
+          filamentGrams: [
+            for (final g in (j['filament_grams'] as List?) ?? const [])
+              if (g is num) g.toDouble(),
+          ],
+        );
+
+  final int printMinutes;
+  final int setupMinutes;
+  final int laborMinutes;
+  final int postProcessingMinutes;
+  final int supportRemovalMinutes;
+
+  /// Na mesma ordem dos filamentos do item.
+  final List<double> filamentGrams;
+
+  Json toJson() => {
+    'print_minutes': printMinutes,
+    'setup_minutes': setupMinutes,
+    'labor_minutes': laborMinutes,
+    'post_processing_minutes': postProcessingMinutes,
+    'support_removal_minutes': supportRemovalMinutes,
+    'filament_grams': filamentGrams,
+  };
+
+  @override
+  List<Object?> get props => [
+    printMinutes,
+    setupMinutes,
+    laborMinutes,
+    postProcessingMinutes,
+    supportRemovalMinutes,
+    filamentGrams,
+  ];
+}
+
 class BudgetItem extends Equatable {
   const BudgetItem({
     required this.id,
@@ -123,6 +178,8 @@ class BudgetItem extends Equatable {
     this.costPreset,
     this.notes,
     this.model3dId,
+    this.unitsPerPrint,
+    this.perPrint,
     this.isLegacy = false,
   });
 
@@ -147,6 +204,8 @@ class BudgetItem extends Equatable {
     costPreset: NamedRef.fromJson(json.obj('cost_preset')),
     notes: json.strOrNull('additional_notes'),
     model3dId: json.strOrNull('model_3d_id'),
+    unitsPerPrint: json.intOrNull('units_per_print'),
+    perPrint: PerPrintValues.fromJson(json.obj('per_print')),
     costs: CostLines.fromItemJson(json),
     totalCostCents: json.integer('item_total_cost'),
     unitCostCents: json.integer('unit_price'),
@@ -173,6 +232,13 @@ class BudgetItem extends Equatable {
   final NamedRef? costPreset;
   final String? notes;
   final String? model3dId;
+
+  /// Peças que uma impressão do arquivo produz; os valores acima já são o
+  /// total escalado para [quantity].
+  final int? unitsPerPrint;
+
+  /// Valores de UMA impressão como o app enviou (reedição sem arredondar).
+  final PerPrintValues? perPrint;
 
   /// Calculado pelo modelo de custos antigo (sem breakdown de mão de obra).
   final bool isLegacy;
