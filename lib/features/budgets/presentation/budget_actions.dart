@@ -46,6 +46,28 @@ Future<TransitionDecision?> confirmTransition(
         confirmLabel: 'Concluir',
       );
       return ok ? const TransitionDecision() : null;
+    case BudgetStatus.draft when to.isRevisionFrom(budget.status):
+      final decision = await FormaDialog.show<TransitionDecision>(
+        context,
+        title: 'Revisar orçamento',
+        description:
+            'Volta para rascunho mantendo o número e o link de aprovação. '
+            'Enquanto você edita, o link mostra que o orçamento está em '
+            'revisão; reenvie quando terminar.',
+        child: const _ReasonForm(
+          label: 'O que a cliente pediu? (opcional)',
+          hint: 'Ex.: tirar o chaveiro "forte e corajosa"',
+          confirmLabel: 'Revisar',
+          destructive: false,
+        ),
+      );
+      if (decision == null) return null;
+      final asked = decision.notes?.trim() ?? '';
+      return TransitionDecision(
+        notes: asked.isEmpty
+            ? 'Revisão solicitada pelo cliente'
+            : 'Revisão solicitada pelo cliente: $asked',
+      );
     case BudgetStatus.rejected || BudgetStatus.cancelled:
       return FormaDialog.show<TransitionDecision>(
         context,
@@ -71,7 +93,17 @@ Future<TransitionDecision?> confirmTransition(
 }
 
 class _ReasonForm extends StatefulWidget {
-  const _ReasonForm();
+  const _ReasonForm({
+    this.label = 'Motivo (opcional)',
+    this.hint = 'Ex.: cliente achou o prazo longo',
+    this.confirmLabel = 'Confirmar',
+    this.destructive = true,
+  });
+
+  final String label;
+  final String hint;
+  final String confirmLabel;
+  final bool destructive;
 
   @override
   State<_ReasonForm> createState() => _ReasonFormState();
@@ -86,6 +118,9 @@ class _ReasonFormState extends State<_ReasonForm> {
     super.dispose();
   }
 
+  void _confirm() =>
+      Navigator.of(context).pop(TransitionDecision(notes: _notes.text));
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -93,8 +128,8 @@ class _ReasonFormState extends State<_ReasonForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FormaTextField(
-          label: 'Motivo (opcional)',
-          hint: 'Ex.: cliente achou o prazo longo',
+          label: widget.label,
+          hint: widget.hint,
           controller: _notes,
           autofocus: true,
           maxLines: 3,
@@ -110,13 +145,18 @@ class _ReasonFormState extends State<_ReasonForm> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             const SizedBox(width: 8),
-            FormaButton.danger(
-              label: 'Confirmar',
-              small: true,
-              onPressed: () => Navigator.of(
-                context,
-              ).pop(TransitionDecision(notes: _notes.text)),
-            ),
+            if (widget.destructive)
+              FormaButton.danger(
+                label: widget.confirmLabel,
+                small: true,
+                onPressed: _confirm,
+              )
+            else
+              FormaButton.primary(
+                label: widget.confirmLabel,
+                small: true,
+                onPressed: _confirm,
+              ),
           ],
         ),
       ],
@@ -166,7 +206,7 @@ class BudgetActions {
       if (transitions.isNotEmpty) const FormaMenuItem.divider(),
       for (final to in transitions)
         FormaMenuItem(
-          label: to.actionLabel,
+          label: to.actionLabelFrom(b.status),
           icon: BudgetStatusStyle.of(to, Theme.of(context).brightness).icon,
           destructive: to == BudgetStatus.cancelled,
           onTap: () => unawaited(move(b, to)),
@@ -226,9 +266,14 @@ class BudgetActions {
     try {
       final updated = await _repo.changeStatus(b.id, to, notes: decision.notes);
       onChanged(updated);
-      if (context.mounted) {
-        Toasts.success(context, '"${b.name}" → ${to.label}');
+      if (!context.mounted) return;
+      if (to.isRevisionFrom(b.status)) {
+        // Revisão: segue direto para a edição.
+        Toasts.success(context, 'Em revisão: edite e reenvie para a cliente');
+        context.go(Routes.budgetEdit(b.id));
+        return;
       }
+      Toasts.success(context, '"${b.name}" → ${to.label}');
     } on ApiError catch (e) {
       if (context.mounted) Toasts.error(context, e);
     }

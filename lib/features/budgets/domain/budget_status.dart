@@ -34,7 +34,8 @@ enum BudgetStatus {
   /// Transições permitidas — fonte única de verdade para o kanban e menus.
   Set<BudgetStatus> get allowedTransitions => switch (this) {
     draft => const {sent, cancelled},
-    sent => const {approved, rejected, expired, cancelled},
+    // sent → draft = revisão pedida pelo cliente (mesmo número e link).
+    sent => const {approved, rejected, expired, cancelled, draft},
     approved => const {printing, cancelled},
     printing => const {completed},
     completed => const {},
@@ -54,6 +55,14 @@ enum BudgetStatus {
       const {draft, sent, approved, rejected, expired}.contains(this);
 
   /// Rótulo da ação que leva a este status ("Marcar como enviado"…).
+  /// Rótulo da ação de levar um orçamento de [from] para este status.
+  String actionLabelFrom(BudgetStatus from) =>
+      isRevisionFrom(from) ? 'Revisar orçamento' : actionLabel;
+
+  /// Voltar um orçamento enviado para rascunho é uma revisão, não um
+  /// cancelamento: mantém número e link de aprovação.
+  bool isRevisionFrom(BudgetStatus from) => from == sent && this == draft;
+
   String get actionLabel => switch (this) {
     draft => 'Voltar para rascunho',
     sent => 'Marcar como enviado',
