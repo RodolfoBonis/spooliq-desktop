@@ -129,6 +129,7 @@ class SlicePlate extends Equatable {
     required this.printSeconds,
     required this.estimated,
     required this.filaments,
+    this.objects = const [],
   });
 
   factory SlicePlate.fromJson(Json j) => SlicePlate(
@@ -137,6 +138,7 @@ class SlicePlate extends Equatable {
     printSeconds: j.integer('print_time_seconds'),
     estimated: j.boolean('estimated'),
     filaments: j.list('filaments', SliceFilament.fromJson),
+    objects: j.list('objects', SliceObject.fromJson),
   );
 
   final int index;
@@ -145,11 +147,44 @@ class SlicePlate extends Equatable {
   final bool estimated;
   final List<SliceFilament> filaments;
 
+  /// Objetos impressos na mesa, agrupados por nome (vazio em G-code puro e
+  /// em análises antigas).
+  final List<SliceObject> objects;
+
   int get hours => printSeconds ~/ 3600;
   int get minutes => (printSeconds % 3600) ~/ 60;
 
   @override
-  List<Object?> get props => [index, printSeconds, filaments];
+  List<Object?> get props => [index, printSeconds, filaments, objects];
+}
+
+/// Um nome de objeto da mesa e quantas cópias dele são impressas.
+class SliceObject extends Equatable {
+  const SliceObject({required this.name, required this.count});
+
+  factory SliceObject.fromJson(Json j) =>
+      SliceObject(name: j.str('name'), count: j.integer('count'));
+
+  final String name;
+  final int count;
+
+  @override
+  List<Object?> get props => [name, count];
+}
+
+/// Quantas peças completas as mesas produzem juntas: soma as cópias de cada
+/// objeto (por nome) e tira o MDC. Ex.: 10 pote + 10 tampa + 10 laço = 10
+/// conjuntos. Null quando o fatiador não informa objetos.
+int? piecesPerPrint(Iterable<SlicePlate> plates) {
+  final counts = <String, int>{};
+  for (final p in plates) {
+    for (final o in p.objects) {
+      if (o.count <= 0) continue;
+      counts[o.name] = (counts[o.name] ?? 0) + o.count;
+    }
+  }
+  if (counts.isEmpty) return null;
+  return counts.values.reduce((a, b) => a.gcd(b));
 }
 
 /// Resultado de `POST /slicer/analyze` ou `GET /models3d/{id}/slice-analysis`.

@@ -123,6 +123,7 @@ class BudgetItem extends Equatable {
     this.costPreset,
     this.notes,
     this.model3dId,
+    this.unitsPerPrint,
     this.isLegacy = false,
   });
 
@@ -147,6 +148,7 @@ class BudgetItem extends Equatable {
     costPreset: NamedRef.fromJson(json.obj('cost_preset')),
     notes: json.strOrNull('additional_notes'),
     model3dId: json.strOrNull('model_3d_id'),
+    unitsPerPrint: json.intOrNull('units_per_print'),
     costs: CostLines.fromItemJson(json),
     totalCostCents: json.integer('item_total_cost'),
     unitCostCents: json.integer('unit_price'),
@@ -173,6 +175,10 @@ class BudgetItem extends Equatable {
   final NamedRef? costPreset;
   final String? notes;
   final String? model3dId;
+
+  /// Peças que uma impressão do arquivo produz; os valores acima já são o
+  /// total escalado para [quantity].
+  final int? unitsPerPrint;
 
   /// Calculado pelo modelo de custos antigo (sem breakdown de mão de obra).
   final bool isLegacy;

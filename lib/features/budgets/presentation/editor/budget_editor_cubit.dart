@@ -288,6 +288,10 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
 
   /// Aplica placas do fatiador a um item: soma tempos e agrega gramas por
   /// slot do AMS (mesmo filamento em placas diferentes vira uma linha só).
+  ///
+  /// Quando o fatiador informa os objetos, os valores passam a ser de UMA
+  /// impressão que produz N peças ([piecesPerPrint]); a quantidade vira N se
+  /// ainda estava no padrão, e o envio escala para qualquer quantidade.
   void applySlice(
     int itemKey,
     List<SlicePlate> plates, {
@@ -304,10 +308,13 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
       }
     }
     final slots = bySlot.keys.toList()..sort();
+    final pieces = piecesPerPrint(plates);
     updateItem(
       itemKey,
       (i) => i.copyWith(
         productName: i.productName.trim().isEmpty ? productName : null,
+        unitsPerPrint: () => pieces,
+        quantity: pieces != null && i.quantity <= 1 ? pieces : null,
         printHours: seconds ~/ 3600,
         printMinutes: (seconds % 3600 + 59) ~/ 60 % 60,
         filaments: [
@@ -329,7 +336,11 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
     AppLogger.info(
       'Fatiamento importado',
       category: 'budgets',
-      data: {'plates': plates.length, 'filaments': slots.length},
+      data: {
+        'plates': plates.length,
+        'filaments': slots.length,
+        'pieces': ?pieces,
+      },
     );
   }
 

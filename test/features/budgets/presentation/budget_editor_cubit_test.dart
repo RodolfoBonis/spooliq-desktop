@@ -10,6 +10,7 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/budget_edit
 import 'package:spooliq_desktop/features/company/domain/company.dart';
 import 'package:spooliq_desktop/features/company/domain/company_repository.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
+import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 
@@ -83,6 +84,66 @@ void main() {
       expect(c.state.draft.profileId, 'p-default');
       expect(c.state.draft.paymentTerms, '50% na aprovação');
       verifyNever(() => budgets.preview(any()));
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'importing a file with 10 sets fills pieces per print and quantity',
+    build: build,
+    act: (c) async {
+      await c.load();
+      c.applySlice(0, const [
+        SlicePlate(
+          index: 1,
+          name: '',
+          printSeconds: 11282,
+          estimated: false,
+          filaments: [SliceFilament(slot: 1, grams: 78.73)],
+          objects: [
+            SliceObject(name: 'pote', count: 10),
+            SliceObject(name: 'tampa', count: 10),
+          ],
+        ),
+        SlicePlate(
+          index: 2,
+          name: '',
+          printSeconds: 1044,
+          estimated: false,
+          filaments: [SliceFilament(slot: 3, grams: 3.51)],
+          objects: [SliceObject(name: 'laco', count: 10)],
+        ),
+      ], productName: 'Potinho');
+    },
+    verify: (c) {
+      final item = c.state.draft.items.single;
+      expect(item.unitsPerPrint, 10);
+      expect(item.quantity, 10);
+      expect(item.printHours * 60 + item.printMinutes, 206);
+      expect(item.filaments.map((f) => f.grams), [78.7, 3.5]);
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'a plain G-code import keeps total mode and the quantity',
+    build: build,
+    act: (c) async {
+      await c.load();
+      c
+        ..updateItem(0, (i) => i.copyWith(quantity: 3, unitsPerPrint: () => 5))
+        ..applySlice(0, const [
+          SlicePlate(
+            index: 1,
+            name: '',
+            printSeconds: 3600,
+            estimated: false,
+            filaments: [SliceFilament(slot: 1, grams: 20)],
+          ),
+        ]);
+    },
+    verify: (c) {
+      final item = c.state.draft.items.single;
+      expect(item.unitsPerPrint, isNull);
+      expect(item.quantity, 3);
     },
   );
 

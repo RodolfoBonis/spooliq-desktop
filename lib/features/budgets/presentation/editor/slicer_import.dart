@@ -235,6 +235,17 @@ class _PlatePickerState extends State<_PlatePicker> {
     for (final p in widget.analysis.plates) p.index,
   };
 
+  String _summary(List<SlicePlate> plates) {
+    final selected = [
+      for (final p in plates)
+        if (_selected.contains(p.index)) p,
+    ];
+    final pieces = piecesPerPrint(selected);
+    final base = '${selected.length} de ${plates.length} selecionadas';
+    if (pieces == null || selected.isEmpty) return base;
+    return '$base · produz $pieces ${pieces == 1 ? 'peça' : 'peças'}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
@@ -253,9 +264,14 @@ class _PlatePickerState extends State<_PlatePicker> {
                   child: FormaCheckbox(
                     value: _selected.contains(p.index),
                     label: p.name.isEmpty ? 'Placa ${p.index}' : p.name,
-                    description:
-                        '${Fmt.duration(p.hours, p.minutes)} · '
-                        '${Fmt.grams(_plateGrams(p))}',
+                    description: [
+                      Fmt.duration(p.hours, p.minutes),
+                      Fmt.grams(_plateGrams(p)),
+                      if (p.objects.isNotEmpty)
+                        p.objects
+                            .map((o) => '${o.count}× ${o.name}')
+                            .join(', '),
+                    ].join(' · '),
                     onChanged: (v) => setState(
                       () => v
                           ? _selected.add(p.index)
@@ -274,9 +290,11 @@ class _PlatePickerState extends State<_PlatePicker> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Text(
-              '${_selected.length} de ${plates.length} selecionadas',
-              style: typo.caption12.copyWith(color: ext.textMuted),
+            Flexible(
+              child: Text(
+                _summary(plates),
+                style: typo.caption12.copyWith(color: ext.textMuted),
+              ),
             ),
             const Spacer(),
             FormaButton.secondary(
