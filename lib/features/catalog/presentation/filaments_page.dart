@@ -510,7 +510,7 @@ class _FilamentsPageState extends State<FilamentsPage> {
               label: 'Estoque atual',
               helperText: 'Só o filamento, sem o peso do carretel vazio',
               value: initialStock,
-              min: 0,
+              min: 1,
               suffixText: 'g',
               onChanged: (v) => initialStock = v,
             ),
@@ -584,8 +584,9 @@ class _FilamentsPageState extends State<FilamentsPage> {
     );
     if (saved == null || !context.mounted) return;
     _cubit.upsert(saved);
-    final stock = initialStock;
-    if (f == null && saved.trackStock && stock != null && stock > 0) {
+    // A API guarda gramas inteiros: 0,4 g arredonda para 0 e não é estoque.
+    final stock = initialStock?.round() ?? 0;
+    if (f == null && saved.trackStock && stock > 0) {
       await _registerInitialStock(context, saved, stock, price);
       return;
     }
@@ -600,7 +601,7 @@ class _FilamentsPageState extends State<FilamentsPage> {
   Future<void> _registerInitialStock(
     BuildContext context,
     Filament saved,
-    num grams,
+    int grams,
     num? pricePerKg,
   ) async {
     try {
@@ -613,24 +614,32 @@ class _FilamentsPageState extends State<FilamentsPage> {
             : (pricePerKg * 100).round(),
         note: 'Estoque inicial',
       );
-      final fresh = await _repo.filament(saved.id);
-      _cubit.upsert(fresh);
-      if (context.mounted) {
-        Toasts.success(
-          context,
-          'Filamento criado com ${Fmt.grams(grams)} em estoque',
-        );
-      }
-    } on ApiError catch (e, st) {
+    } on Object catch (e, st) {
       unawaited(AppLogger.error(e, st, reason: 'filament_initial_stock'));
       if (context.mounted) {
         FormaToast.show(
           context,
           message: 'Filamento criado, mas sem o estoque inicial',
-          description: '${e.message} Registre pelo botão Estoque.',
+          description:
+              '${e is ApiError ? e.message : 'Falha de comunicação.'} '
+              'Registre pelo botão Estoque.',
           variant: FormaToastVariant.warning,
         );
       }
+      return;
+    }
+    if (context.mounted) {
+      Toasts.success(
+        context,
+        'Filamento criado com ${Fmt.grams(grams)} em estoque',
+      );
+    }
+    // O saldo da lista é só exibição: se a releitura falhar, o estoque já
+    // foi registrado e aparece na próxima atualização.
+    try {
+      _cubit.upsert(await _repo.filament(saved.id));
+    } on Object catch (e) {
+      AppLogger.warning('Falha ao atualizar o saldo do filamento', error: e);
     }
   }
 
