@@ -9,6 +9,7 @@ import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/state/paged_list_cubit.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/form_dialog.dart';
@@ -319,6 +320,8 @@ class _FilamentsPageState extends State<FilamentsPage> {
     var active = f?.isActive ?? true;
     var track = f?.trackStock ?? false;
     num? threshold = f?.lowStockThresholdGrams;
+    // Só no cadastro: vira uma compra logo após criar o filamento.
+    num? initialStock;
     String? selectError;
 
     final saved = await showFormDialog<Filament>(
@@ -437,6 +440,7 @@ class _FilamentsPageState extends State<FilamentsPage> {
             Expanded(
               child: FormaNumberField(
                 label: 'Peso do carretel',
+                helperText: 'Filamento de um carretel novo (ex.: 1000 g)',
                 value: weight,
                 min: 0,
                 suffixText: 'g',
@@ -499,6 +503,18 @@ class _FilamentsPageState extends State<FilamentsPage> {
               ),
           ],
         ),
+        if (track && f == null)
+          SizedBox(
+            width: 260,
+            child: FormaNumberField(
+              label: 'Estoque atual',
+              helperText: 'Só o filamento, sem o peso do carretel vazio',
+              value: initialStock,
+              min: 1,
+              suffixText: 'g',
+              onChanged: (v) => initialStock = v,
+            ),
+          ),
         if (f != null)
           FormaCheckbox(
             value: active,
@@ -568,10 +584,63 @@ class _FilamentsPageState extends State<FilamentsPage> {
     );
     if (saved == null || !context.mounted) return;
     _cubit.upsert(saved);
+    // A API guarda gramas inteiros: 0,4 g arredonda para 0 e não é estoque.
+    final stock = initialStock?.round() ?? 0;
+    if (f == null && saved.trackStock && stock > 0) {
+      await _registerInitialStock(context, saved, stock, price);
+      return;
+    }
     Toasts.success(
       context,
       f == null ? 'Filamento criado' : 'Filamento atualizado',
     );
+  }
+
+  /// O saldo só muda por movimentações: o estoque informado no cadastro vira
+  /// uma compra. Se falhar, o filamento já existe e o saldo é ajustável depois.
+  Future<void> _registerInitialStock(
+    BuildContext context,
+    Filament saved,
+    int grams,
+    num? pricePerKg,
+  ) async {
+    try {
+      await _repo.addStockMovement(
+        saved.id,
+        type: StockMovementType.purchase,
+        grams: grams.toDouble(),
+        unitPricePerKgCents: pricePerKg == null
+            ? null
+            : (pricePerKg * 100).round(),
+        note: 'Estoque inicial',
+      );
+    } on Object catch (e, st) {
+      unawaited(AppLogger.error(e, st, reason: 'filament_initial_stock'));
+      if (context.mounted) {
+        FormaToast.show(
+          context,
+          message: 'Filamento criado, mas sem o estoque inicial',
+          description:
+              '${e is ApiError ? e.message : 'Falha de comunicação.'} '
+              'Registre pelo botão Estoque.',
+          variant: FormaToastVariant.warning,
+        );
+      }
+      return;
+    }
+    if (context.mounted) {
+      Toasts.success(
+        context,
+        'Filamento criado com ${Fmt.grams(grams)} em estoque',
+      );
+    }
+    // O saldo da lista é só exibição: se a releitura falhar, o estoque já
+    // foi registrado e aparece na próxima atualização.
+    try {
+      _cubit.upsert(await _repo.filament(saved.id));
+    } on Object catch (e) {
+      AppLogger.warning('Falha ao atualizar o saldo do filamento', error: e);
+    }
   }
 
   Future<void> _delete(BuildContext context, Filament f) async {

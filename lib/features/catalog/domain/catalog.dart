@@ -245,7 +245,8 @@ class FilamentInput extends Equatable {
     'bed_temperature': bedTemperature,
     'is_active': isActive,
     'track_stock': trackStock,
-    'low_stock_threshold_grams': lowStockThresholdGrams,
+    // A API guarda gramas inteiros.
+    'low_stock_threshold_grams': lowStockThresholdGrams?.round(),
   });
 
   @override
