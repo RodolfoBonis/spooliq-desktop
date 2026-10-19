@@ -478,10 +478,8 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       if (line.trim().isNotEmpty) line.trim(),
   ];
 
-  Future<void> _details(Plan p) => FormaSideSheet.show<void>(
-    context,
-    builder: (_) => _PlanSheet(plan: p),
-  );
+  Future<void> _details(Plan p) =>
+      FormaSideSheet.show<void>(context, builder: (_) => _PlanSheet(plan: p));
 }
 
 class _PlanSheet extends StatefulWidget {
@@ -747,10 +745,7 @@ class _MigrationSheetState extends State<_MigrationSheet> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            m.statusLabel,
-            style: typo.h4.copyWith(color: ext.textPrimary),
-          ),
+          Text(m.statusLabel, style: typo.h4.copyWith(color: ext.textPrimary)),
           const SizedBox(height: 4),
           Text(
             [

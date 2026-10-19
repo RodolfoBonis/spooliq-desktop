@@ -209,10 +209,8 @@ class _CustomersViewState extends State<_CustomersView> {
             id: 'city',
             label: 'Cidade',
             flex: 2,
-            cellBuilder: (_, c) => Text(
-              c.location.isEmpty ? '—' : c.location,
-              style: muted,
-            ),
+            cellBuilder: (_, c) =>
+                Text(c.location.isEmpty ? '—' : c.location, style: muted),
           ),
           FormaColumn(
             id: 'budgets',

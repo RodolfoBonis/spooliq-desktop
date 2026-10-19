@@ -168,9 +168,7 @@ class _NotificationTile extends StatelessWidget {
                   Text(
                     n.title,
                     style: (n.isRead ? typo.body14 : typo.body14Medium)
-                        .copyWith(
-                          color: ext.textPrimary,
-                        ),
+                        .copyWith(color: ext.textPrimary),
                   ),
                   if (n.body != null && n.body!.isNotEmpty)
                     Text(

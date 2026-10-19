@@ -119,9 +119,8 @@ class _LoginFormState extends State<_LoginForm> {
               icon: const Icon(Icons.fingerprint, size: 18),
               width: double.infinity,
               isLoading: state.submitting,
-              onPressed: () => unawaited(
-                context.read<LoginCubit>().quickLogin(),
-              ),
+              onPressed: () =>
+                  unawaited(context.read<LoginCubit>().quickLogin()),
             ),
             const SizedBox(height: 4),
             Center(

@@ -7,11 +7,8 @@ class ApiDashboardRepository implements DashboardRepository {
 
   final ApiClient _api;
 
-  Future<Json> _get(String path, DashboardPeriod? p, {int? limit}) =>
-      _api.getJson(
-        '/dashboard/$path',
-        query: {'period': p?.value, 'limit': limit},
-      );
+  Future<Json> _get(String path, DashboardPeriod? p, {int? limit}) => _api
+      .getJson('/dashboard/$path', query: {'period': p?.value, 'limit': limit});
 
   @override
   Future<Overview> overview(DashboardPeriod p) async =>
@@ -86,9 +83,9 @@ class ApiDashboardRepository implements DashboardRepository {
       );
 
   @override
-  Future<List<Activity>> recentActivity() async =>
-      (await _get('recent-activity', null, limit: 12)).list(
-        'activities',
-        Activity.fromJson,
-      );
+  Future<List<Activity>> recentActivity() async => (await _get(
+    'recent-activity',
+    null,
+    limit: 12,
+  )).list('activities', Activity.fromJson);
 }

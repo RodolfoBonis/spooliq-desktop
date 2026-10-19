@@ -84,9 +84,7 @@ class _CancelBodyState extends State<_CancelBody> {
         _error = e.message;
       });
     } on Object catch (e, st) {
-      unawaited(
-        AppLogger.error(e, st, reason: 'cancel_subscription'),
-      );
+      unawaited(AppLogger.error(e, st, reason: 'cancel_subscription'));
       if (!mounted) return;
       setState(() {
         _saving = false;

@@ -66,9 +66,7 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerLazySingleton<ActivityRepository>(
       () => ApiActivityRepository(api),
     )
-    ..registerLazySingleton<AccountRepository>(
-      () => ApiAccountRepository(api),
-    )
+    ..registerLazySingleton<AccountRepository>(() => ApiAccountRepository(api))
     ..registerLazySingleton<NotificationRepository>(
       () => ApiNotificationRepository(api),
     )
@@ -86,13 +84,9 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerLazySingleton<DashboardRepository>(
       () => ApiDashboardRepository(api),
     )
-    ..registerLazySingleton<BillingRepository>(
-      () => ApiBillingRepository(api),
-    )
+    ..registerLazySingleton<BillingRepository>(() => ApiBillingRepository(api))
     ..registerLazySingleton<AdminRepository>(() => ApiAdminRepository(api))
-    ..registerLazySingleton<Model3DRepository>(
-      () => ApiModel3DRepository(api),
-    )
+    ..registerLazySingleton<Model3DRepository>(() => ApiModel3DRepository(api))
   // (insights registrations)
   ;
 }

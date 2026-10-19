@@ -59,10 +59,10 @@ class _ModelPreviewState extends State<ModelPreview> {
     }
     try {
       final bytes = await di<Model3DRepository>().download(id);
-      final mesh = await compute(
-        _parseInBackground,
-        (bytes, widget.model.fileName),
-      );
+      final mesh = await compute(_parseInBackground, (
+        bytes,
+        widget.model.fileName,
+      ));
       _cache[id] = mesh;
       if (mounted) setState(() => _mesh = mesh);
     } on ApiError catch (e) {

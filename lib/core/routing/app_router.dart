@@ -59,10 +59,8 @@ GoRouter buildRouter(SessionCubit session) {
         ),
       );
 
-  GoRoute page(String path, Widget Function(GoRouterState s) build) => GoRoute(
-    path: path,
-    pageBuilder: (_, state) => fade(state, build(state)),
-  );
+  GoRoute page(String path, Widget Function(GoRouterState s) build) =>
+      GoRoute(path: path, pageBuilder: (_, state) => fade(state, build(state)));
 
   return GoRouter(
     initialLocation: Routes.dashboard,
@@ -103,9 +101,8 @@ GoRouter buildRouter(SessionCubit session) {
           ),
           page(
             Routes.budgetNew,
-            (s) => BudgetEditorPage(
-              customerId: s.uri.queryParameters['customer'],
-            ),
+            (s) =>
+                BudgetEditorPage(customerId: s.uri.queryParameters['customer']),
           ),
           page(
             '/budgets/:id',
@@ -117,9 +114,8 @@ GoRouter buildRouter(SessionCubit session) {
           ),
           page(
             Routes.customers,
-            (s) => CustomersPage(
-              openCreate: s.uri.queryParameters['new'] == '1',
-            ),
+            (s) =>
+                CustomersPage(openCreate: s.uri.queryParameters['new'] == '1'),
           ),
           page(
             '/customers/:id',

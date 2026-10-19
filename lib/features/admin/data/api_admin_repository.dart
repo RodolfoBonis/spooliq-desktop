@@ -176,9 +176,7 @@ class ApiAdminRepository implements AdminRepository {
   @override
   Future<PlanMigration> migration(String migrationId) async =>
       PlanMigration.fromJson(
-        await _api.getJson(
-          '/admin/subscription-plans/migrations/$migrationId',
-        ),
+        await _api.getJson('/admin/subscription-plans/migrations/$migrationId'),
       );
 
   @override

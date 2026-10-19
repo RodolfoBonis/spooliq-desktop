@@ -296,10 +296,7 @@ class _FilamentsPageState extends State<FilamentsPage> {
 
   Future<void> _edit(BuildContext context, [Filament? f]) async {
     if (_brands.isEmpty || _materials.isEmpty) {
-      Toasts.info(
-        context,
-        'Cadastre ao menos uma marca e um material antes.',
-      );
+      Toasts.info(context, 'Cadastre ao menos uma marca e um material antes.');
       return;
     }
     final name = TextEditingController(text: f?.name);

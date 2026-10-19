@@ -46,9 +46,8 @@ class BudgetDetailPage extends StatelessWidget {
             return state.error != null
                 ? ErrorView(
                     message: state.error!,
-                    onRetry: () => unawaited(
-                      context.read<BudgetDetailCubit>().load(),
-                    ),
+                    onRetry: () =>
+                        unawaited(context.read<BudgetDetailCubit>().load()),
                   )
                 : const LoadingView();
           }

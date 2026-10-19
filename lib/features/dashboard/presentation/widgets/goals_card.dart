@@ -159,10 +159,7 @@ class _GoalRow extends StatelessWidget {
 }
 
 /// Diálogo para definir as metas mensais. Campo vazio ou zero remove a meta.
-Future<void> showGoalsDialog(
-  BuildContext context,
-  GoalsSummary current,
-) async {
+Future<void> showGoalsDialog(BuildContext context, GoalsSummary current) async {
   final cubit = context.read<DashboardCubit>();
   final initial = <GoalMetric, num?>{
     for (final m in GoalMetric.values)

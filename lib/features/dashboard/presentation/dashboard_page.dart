@@ -1051,9 +1051,7 @@ class _ActivityFeed extends StatelessWidget {
   Widget build(BuildContext context) {
     return dashSection(context, section, (items) {
       if (items.isEmpty) return dashEmpty(context, 'Nenhuma atividade ainda.');
-      return Column(
-        children: [for (final a in items) ActivityTile(a)],
-      );
+      return Column(children: [for (final a in items) ActivityTile(a)]);
     });
   }
 }

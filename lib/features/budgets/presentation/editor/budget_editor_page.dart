@@ -372,10 +372,7 @@ class _Form extends StatelessWidget {
         const SizedBox(height: 24),
         Row(
           children: [
-            Text(
-              'Itens',
-              style: typo.title16.copyWith(color: ext.textPrimary),
-            ),
+            Text('Itens', style: typo.title16.copyWith(color: ext.textPrimary)),
             const SizedBox(width: 8),
             Text(
               '${d.items.length}',
@@ -599,13 +596,20 @@ class _Form extends StatelessWidget {
         .filaments
         .where((f) => f.filamentId.isEmpty)
         .length;
+    final unmatchedMessage =
+        '$unmatched filamento(s) sem correspondência no catálogo — '
+        'selecione manualmente.';
     FormaToast.show(
       context,
       message: 'Fatiamento importado',
-      description: unmatched == 0
-          ? 'Tempo e filamentos preenchidos.'
-          : '$unmatched filamento(s) sem correspondência no catálogo — '
-                'selecione manualmente.',
+      description: [
+        if (unmatched == 0)
+          'Tempo e filamentos preenchidos.'
+        else
+          unmatchedMessage,
+        if (result.isLibraryFormat && !result.canSaveToLibrary)
+          'Arquivo grande demais para a biblioteca de modelos (máx. 50 MB).',
+      ].join(' '),
       variant: unmatched == 0
           ? FormaToastVariant.success
           : FormaToastVariant.warning,

@@ -43,9 +43,7 @@ class UpdateChecker {
   Future<AvailableUpdate?> check(String current) async {
     final res = await _dio.get<Map<String, dynamic>>(
       feedUrl,
-      options: Options(
-        headers: {'Accept': 'application/vnd.github+json'},
-      ),
+      options: Options(headers: {'Accept': 'application/vnd.github+json'}),
     );
     final json = res.data;
     if (json == null) return null;

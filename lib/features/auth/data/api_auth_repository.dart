@@ -51,10 +51,7 @@ class ApiAuthRepository implements AuthRepository {
     final user = SessionUser.fromAccessToken(access);
     if (user == null) throw const ServerError('Token de acesso inválido.');
     await _tokens.write(
-      AuthTokens(
-        accessToken: access,
-        refreshToken: json.str('refreshToken'),
-      ),
+      AuthTokens(accessToken: access, refreshToken: json.str('refreshToken')),
     );
     AppLogger.info('Login realizado', category: 'auth');
     return user;

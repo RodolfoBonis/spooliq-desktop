@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:spooliq_desktop/core/network/api_client.dart';
 import 'package:spooliq_desktop/core/network/paginated.dart';
+import 'package:spooliq_desktop/features/models3d/data/slice_upload.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 
 class ApiModel3DRepository implements Model3DRepository {
@@ -90,12 +91,21 @@ class ApiModel3DRepository implements Model3DRepository {
   Future<SliceAnalysis> analyzeFile(
     String filePath, {
     void Function(int sent, int total)? onProgress,
-  }) async => SliceAnalysis.fromJson(
-    await _api.upload(
-      '/slicer/analyze',
-      field: 'file',
-      filePath: filePath,
-      onProgress: onProgress,
-    ),
-  );
+  }) async {
+    // Projetos grandes (ex.: 29 mesas, 200+ MB) passam do limite do servidor;
+    // a análise só precisa dos metadados, então subimos uma versão enxuta.
+    final upload = await prepareSliceUpload(filePath);
+    try {
+      return SliceAnalysis.fromJson(
+        await _api.upload(
+          '/slicer/analyze',
+          field: 'file',
+          filePath: upload.path,
+          onProgress: onProgress,
+        ),
+      );
+    } finally {
+      await upload.dispose();
+    }
+  }
 }

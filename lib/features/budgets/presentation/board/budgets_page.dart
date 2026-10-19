@@ -336,9 +336,8 @@ class _BoardView extends StatelessWidget {
           canMove: (b, from, to) => BudgetStatus.fromValue(
             from,
           ).canTransitionTo(BudgetStatus.fromValue(to)),
-          onMove: (b, from, to) => unawaited(
-            actions.move(b, BudgetStatus.fromValue(to)),
-          ),
+          onMove: (b, from, to) =>
+              unawaited(actions.move(b, BudgetStatus.fromValue(to))),
           cardBuilder: (context, b) => BudgetCard(
             budget: b,
             busy: state.moving.contains(b.id),
