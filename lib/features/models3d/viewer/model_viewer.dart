@@ -53,12 +53,8 @@ class _Camera {
   double distance;
   List<double> target;
 
-  _Camera copy() => _Camera(
-    yaw: yaw,
-    pitch: pitch,
-    distance: distance,
-    target: [...target],
-  );
+  _Camera copy() =>
+      _Camera(yaw: yaw, pitch: pitch, distance: distance, target: [...target]);
 }
 
 class _ModelViewerState extends State<ModelViewer> {

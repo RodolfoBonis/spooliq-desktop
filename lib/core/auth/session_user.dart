@@ -102,11 +102,8 @@ class SessionUser extends Equatable {
   bool get canManage => isOwner || isOrgAdmin;
 
   /// Acesso às áreas da organização (orçamentos, clientes, catálogo…).
-  bool get hasOrganizationAccess => hasAny(const [
-    Role.owner,
-    Role.orgAdmin,
-    Role.user,
-  ]);
+  bool get hasOrganizationAccess =>
+      hasAny(const [Role.owner, Role.orgAdmin, Role.user]);
 
   Role? get primaryRole {
     for (final r in Role.values) {

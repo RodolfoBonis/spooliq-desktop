@@ -294,11 +294,7 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
   /// Quando o fatiador informa os objetos, os valores passam a ser de UMA
   /// impressão que produz N peças ([piecesPerPrint]); a quantidade vira N se
   /// ainda estava no padrão, e o envio escala para qualquer quantidade.
-  void applySlice(
-    int itemKey,
-    List<SlicePlate> plates, {
-    String? productName,
-  }) {
+  void applySlice(int itemKey, List<SlicePlate> plates, {String? productName}) {
     if (plates.isEmpty) return;
     final seconds = plates.fold<int>(0, (s, p) => s + p.printSeconds);
     // Arredonda para cima no minuto, levando a hora junto (1h59m40s → 2h00).

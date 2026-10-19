@@ -245,9 +245,8 @@ class _FilamentStockSheetState extends State<FilamentStockSheet> {
                     ))
                       FormaSelectOption(value: t, label: t.label),
                   ],
-                  onChanged: (v) => setState(
-                    () => _type = v ?? StockMovementType.purchase,
-                  ),
+                  onChanged: (v) =>
+                      setState(() => _type = v ?? StockMovementType.purchase),
                 ),
               ),
               const SizedBox(width: 10),

@@ -7,11 +7,8 @@ class ApiAccountRepository implements AccountRepository {
   final ApiClient _api;
 
   @override
-  Future<void> forgotPassword(String email) => _api.post(
-    '/password/forgot',
-    body: {'email': email.trim()},
-    auth: false,
-  );
+  Future<void> forgotPassword(String email) =>
+      _api.post('/password/forgot', body: {'email': email.trim()}, auth: false);
 
   @override
   Future<Me> me() async => Me.fromJson(await _api.getJson('/me'));

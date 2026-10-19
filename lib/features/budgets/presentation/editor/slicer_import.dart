@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -22,8 +23,16 @@ class SlicerImport {
   final String fileName;
   final String filePath;
 
+  /// Limite de upload da biblioteca de modelos no servidor.
+  static const int libraryMaxBytes = 50 * 1024 * 1024;
+
   /// A biblioteca de modelos aceita STL e 3MF (inclui `.gcode.3mf`).
-  bool get canSaveToLibrary => fileName.toLowerCase().endsWith('.3mf');
+  bool get isLibraryFormat => fileName.toLowerCase().endsWith('.3mf');
+
+  /// Projetos grandes demais para a biblioteca ainda podem ser importados
+  /// (a análise usa só os metadados), mas não salvos nela.
+  bool get canSaveToLibrary =>
+      isLibraryFormat && File(filePath).lengthSync() <= libraryMaxBytes;
 
   String get productName => fileName
       .replaceAll(
@@ -39,10 +48,7 @@ class SlicerImport {
 Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
   final file = await openFile(
     acceptedTypeGroups: const [
-      XTypeGroup(
-        label: 'Arquivos do fatiador',
-        extensions: ['gcode', '3mf'],
-      ),
+      XTypeGroup(label: 'Arquivos do fatiador', extensions: ['gcode', '3mf']),
     ],
   );
   if (file == null || !context.mounted) return null;
@@ -81,11 +87,7 @@ Future<SlicerImport?> pickSlicerFile(BuildContext context) async {
     child: _PlatePicker(analysis: analysis),
   );
   if (plates == null || plates.isEmpty) return null;
-  return SlicerImport(
-    plates: plates,
-    fileName: file.name,
-    filePath: file.path,
-  );
+  return SlicerImport(plates: plates, fileName: file.name, filePath: file.path);
 }
 
 /// Faz a análise dentro do diálogo e fecha com o resultado.
@@ -255,38 +257,65 @@ class _PlatePickerState extends State<_PlatePicker> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final p in plates)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FormaCheckbox(
-                    value: _selected.contains(p.index),
-                    label: p.name.isEmpty ? 'Placa ${p.index}' : p.name,
-                    description: [
-                      Fmt.duration(p.hours, p.minutes),
-                      Fmt.grams(_plateGrams(p)),
-                      if (p.objects.isNotEmpty)
-                        p.objects
-                            .map((o) => '${o.count}× ${o.name}')
-                            .join(', '),
-                    ].join(' · '),
-                    onChanged: (v) => setState(
-                      () => v
-                          ? _selected.add(p.index)
-                          : _selected.remove(p.index),
-                    ),
-                  ),
-                ),
-                for (final f in p.filaments.take(6))
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: FilamentSwatch(colorHex: f.colorHex, size: 14),
-                  ),
-              ],
+        if (plates.length > 6)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => setState(() {
+                if (_selected.length == plates.length) {
+                  _selected.clear();
+                } else {
+                  _selected.addAll(plates.map((p) => p.index));
+                }
+              }),
+              child: Text(
+                _selected.length == plates.length
+                    ? 'Desmarcar todas'
+                    : 'Marcar todas',
+              ),
             ),
           ),
+        // Projetos com dezenas de mesas não cabem no diálogo: a lista rola.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final p in plates)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FormaCheckbox(
+                          value: _selected.contains(p.index),
+                          label: p.name.isEmpty ? 'Placa ${p.index}' : p.name,
+                          description: [
+                            Fmt.duration(p.hours, p.minutes),
+                            Fmt.grams(_plateGrams(p)),
+                            if (p.objects.isNotEmpty)
+                              p.objects
+                                  .map((o) => '${o.count}× ${o.name}')
+                                  .join(', '),
+                          ].join(' · '),
+                          onChanged: (v) => setState(
+                            () => v
+                                ? _selected.add(p.index)
+                                : _selected.remove(p.index),
+                          ),
+                        ),
+                      ),
+                      for (final f in p.filaments.take(6))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: FilamentSwatch(colorHex: f.colorHex, size: 14),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         Row(
           children: [

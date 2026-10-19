@@ -28,11 +28,7 @@ String? insightRoute(InsightAction a) {
 
 /// "O que fazer agora": recomendações ordenadas por severidade e impacto.
 class InsightsPanel extends StatelessWidget {
-  const InsightsPanel({
-    required this.section,
-    this.onOpenGoals,
-    super.key,
-  });
+  const InsightsPanel({required this.section, this.onOpenGoals, super.key});
 
   final Section<List<Insight>> section;
 

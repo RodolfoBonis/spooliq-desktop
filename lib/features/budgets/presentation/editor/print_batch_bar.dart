@@ -68,9 +68,8 @@ class PrintBatchBar extends StatelessWidget {
                 final units = v?.toInt();
                 if (units == null || units < 1) return;
                 onChanged(
-                  (i) => i.copyWith(
-                    unitsPerPrint: () => units.clamp(1, 1000000),
-                  ),
+                  (i) =>
+                      i.copyWith(unitsPerPrint: () => units.clamp(1, 1000000)),
                 );
               },
             ),

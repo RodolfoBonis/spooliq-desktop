@@ -41,10 +41,8 @@ class ApiCustomerRepository implements CustomerRepository {
   Future<void> delete(String id) => _api.delete('/customers/$id');
 
   @override
-  Future<Uint8List> exportCsv({String? search}) => _api.download(
-    '/customers/export.csv',
-    query: {'q': search},
-  );
+  Future<Uint8List> exportCsv({String? search}) =>
+      _api.download('/customers/export.csv', query: {'q': search});
 
   @override
   Future<CustomerImportResult> importCsv(String filePath) async =>

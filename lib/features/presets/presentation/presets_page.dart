@@ -29,19 +29,16 @@ class PresetsPage extends StatelessWidget {
     return BlocProvider(
       key: ValueKey(type),
       create: (_) {
-        final cubit = PagedListCubit<Preset>(
-          (_) async {
-            final items = await repo.list(type);
-            return Paginated(
-              items: items,
-              total: items.length,
-              page: 1,
-              pageSize: items.length,
-              totalPages: 1,
-            );
-          },
-          idOf: (p) => p.id,
-        );
+        final cubit = PagedListCubit<Preset>((_) async {
+          final items = await repo.list(type);
+          return Paginated(
+            items: items,
+            total: items.length,
+            page: 1,
+            pageSize: items.length,
+            totalPages: 1,
+          );
+        }, idOf: (p) => p.id);
         unawaited(cubit.load());
         return cubit;
       },

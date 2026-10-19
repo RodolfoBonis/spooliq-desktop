@@ -497,9 +497,7 @@ class _FilamentList extends StatelessWidget {
                         : FormaSelectOption(
                             value: _placeholder(f),
                             label: f.label,
-                            leading: FilamentSwatch(
-                              colorHex: f.colorHex,
-                            ),
+                            leading: FilamentSwatch(colorHex: f.colorHex),
                           ),
                     search: _search,
                     onChanged: (opt) {

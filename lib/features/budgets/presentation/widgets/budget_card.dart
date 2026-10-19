@@ -50,9 +50,7 @@ class _BudgetCardState extends State<BudgetCard> {
           decoration: BoxDecoration(
             color: ext.cardBackground,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _hover ? ext.borderStrong : ext.border,
-            ),
+            border: Border.all(color: _hover ? ext.borderStrong : ext.border),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: _hover ? 0.08 : 0.03),

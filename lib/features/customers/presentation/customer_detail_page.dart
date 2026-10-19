@@ -134,9 +134,8 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       context: context,
       user: user,
       onChanged: _replaceBudget,
-      onDeleted: (id) => setState(
-        () => _budgets = _budgets.where((b) => b.id != id).toList(),
-      ),
+      onDeleted: (id) =>
+          setState(() => _budgets = _budgets.where((b) => b.id != id).toList()),
     );
     final won = _budgets.where(
       (b) =>
