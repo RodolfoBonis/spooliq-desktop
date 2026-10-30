@@ -100,6 +100,40 @@ class BudgetItemFilament extends Equatable {
 /// Item (produto) do orçamento, com custos calculados pelo servidor (centavos).
 /// Valores de uma impressão do arquivo, guardados junto do item para que a
 /// reedição não dependa de desfazer o arredondamento dos totais.
+/// Insumo (nao impresso) usado por um item; `total` e o custo de todas as
+/// pecas do item em centavos.
+class BudgetItemSupply extends Equatable {
+  const BudgetItemSupply({
+    required this.supplyId,
+    required this.name,
+    required this.unit,
+    required this.unitCostCents,
+    required this.quantityPerPiece,
+    required this.totalCents,
+  });
+
+  factory BudgetItemSupply.fromJson(Json json) => BudgetItemSupply(
+    supplyId: json.str('supply_id'),
+    name: json.str('name'),
+    unit: json.str('unit'),
+    unitCostCents: json.integer('unit_cost'),
+    quantityPerPiece: json.dbl('quantity_per_piece'),
+    totalCents: json.integer('total'),
+  );
+
+  final String supplyId;
+  final String name;
+  final String unit;
+  final int unitCostCents;
+  final double quantityPerPiece;
+
+  /// Custo total do insumo para o item inteiro (centavos).
+  final int totalCents;
+
+  @override
+  List<Object?> get props => [supplyId, quantityPerPiece, totalCents];
+}
+
 class PerPrintValues extends Equatable {
   const PerPrintValues({
     required this.printMinutes,
@@ -171,6 +205,7 @@ class BudgetItem extends Equatable {
     required this.saleUnitPriceCents,
     required this.saleTotalCents,
     required this.filaments,
+    required this.supplies,
     required this.order,
     this.description,
     this.dimensions,
@@ -213,6 +248,7 @@ class BudgetItem extends Equatable {
     saleTotalCents: json.integer('sale_total'),
     filaments: json.list('filaments', BudgetItemFilament.fromJson)
       ..sort((a, b) => a.order.compareTo(b.order)),
+    supplies: json.list('supplies', BudgetItemSupply.fromJson),
     order: json.integer('order'),
   );
 
@@ -248,6 +284,7 @@ class BudgetItem extends Equatable {
   final int saleUnitPriceCents;
   final int saleTotalCents;
   final List<BudgetItemFilament> filaments;
+  final List<BudgetItemSupply> supplies;
   final int order;
 
   double get totalGrams => filaments.fold(0, (sum, f) => sum + f.grams);
@@ -267,6 +304,7 @@ class BudgetItem extends Equatable {
 class CostLines extends Equatable {
   const CostLines({
     this.filament = 0,
+    this.supplies = 0,
     this.waste = 0,
     this.energy = 0,
     this.machine = 0,
@@ -281,6 +319,7 @@ class CostLines extends Equatable {
 
   factory CostLines.fromItemJson(Json json) => CostLines(
     filament: json.integer('filament_cost'),
+    supplies: json.integer('supplies_cost'),
     waste: json.integer('waste_cost'),
     energy: json.integer('energy_cost'),
     machine: json.integer('machine_cost'),
@@ -295,6 +334,7 @@ class CostLines extends Equatable {
 
   factory CostLines.fromBudgetJson(Json json) => CostLines(
     filament: json.integer('filament_cost'),
+    supplies: json.integer('supplies_cost'),
     waste: json.integer('waste_cost'),
     energy: json.integer('energy_cost'),
     machine: json.integer('machine_cost'),
@@ -307,6 +347,7 @@ class CostLines extends Equatable {
   );
 
   final int filament;
+  final int supplies;
   final int waste;
   final int energy;
   final int machine;
@@ -320,6 +361,7 @@ class CostLines extends Equatable {
 
   int get direct =>
       filament +
+      supplies +
       waste +
       energy +
       machine +
@@ -334,6 +376,7 @@ class CostLines extends Equatable {
   @override
   List<Object?> get props => [
     filament,
+    supplies,
     waste,
     energy,
     machine,

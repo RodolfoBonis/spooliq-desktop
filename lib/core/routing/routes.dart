@@ -17,6 +17,7 @@ abstract final class Routes {
   static const filaments = '/catalog/filaments';
   static const materials = '/catalog/materials';
   static const brands = '/catalog/brands';
+  static const supplies = '/catalog/supplies';
   static const models = '/catalog/models';
   static const machines = '/presets/machines';
   static const energy = '/presets/energy';
@@ -115,6 +116,13 @@ const navigation = <NavGroup>[
         label: 'Marcas',
         icon: Icons.sell_outlined,
         visible: _org,
+      ),
+      NavEntry(
+        path: Routes.supplies,
+        label: 'Insumos',
+        icon: Icons.category_outlined,
+        visible: _org,
+        keywords: ['led', 'acessorio', 'embalagem', 'extras'],
       ),
       NavEntry(
         path: Routes.models,

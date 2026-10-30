@@ -20,6 +20,7 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/budget_edit
 import 'package:spooliq_desktop/features/catalog/presentation/brands_page.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/filaments_page.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/materials_page.dart';
+import 'package:spooliq_desktop/features/catalog/presentation/supplies_page.dart';
 import 'package:spooliq_desktop/features/company/presentation/branding_page.dart';
 import 'package:spooliq_desktop/features/company/presentation/company_settings_page.dart';
 import 'package:spooliq_desktop/features/customers/presentation/customer_detail_page.dart';
@@ -130,6 +131,7 @@ GoRouter buildRouter(SessionCubit session) {
           ),
           page(Routes.materials, (_) => const MaterialsPage()),
           page(Routes.brands, (_) => const BrandsPage()),
+          page(Routes.supplies, (_) => const SuppliesPage()),
           page(Routes.models, (_) => const ModelsPage()),
           page(Routes.profiles, (_) => const ProfilesPage()),
           page(

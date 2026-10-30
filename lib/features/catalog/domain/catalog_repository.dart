@@ -26,6 +26,21 @@ abstract interface class CatalogRepository {
   });
   Future<void> deleteMaterial(String id);
 
+  // Insumos.
+  Future<Paginated<Supply>> supplies({
+    PageQuery page = const PageQuery(pageSize: 100),
+    bool? isActive,
+  });
+  Future<Supply> saveSupply({
+    required String name,
+    required SupplyUnit unit,
+    required int unitCostCents,
+    String? id,
+    String? description,
+    bool? isActive,
+  });
+  Future<void> deleteSupply(String id);
+
   // Filamentos.
   Future<Paginated<Filament>> filaments({
     PageQuery page = const PageQuery(),

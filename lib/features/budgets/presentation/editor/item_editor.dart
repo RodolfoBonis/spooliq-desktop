@@ -11,6 +11,7 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/draft_text_
 import 'package:spooliq_desktop/features/budgets/presentation/editor/print_batch_bar.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog_repository.dart';
+import 'package:spooliq_desktop/features/catalog/presentation/supplies_page.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
@@ -224,6 +225,15 @@ class ItemEditor extends StatelessWidget {
                   error: err('filaments'),
                   onChanged: (list) =>
                       onChanged((i) => i.copyWith(filaments: list)),
+                ),
+                const SizedBox(height: 20),
+                const _Subheader('Insumos', trailing: 'por peça'),
+                const SizedBox(height: 8),
+                _SupplyList(
+                  supplies: item.supplies,
+                  quantity: item.quantity,
+                  onChanged: (list) =>
+                      onChanged((i) => i.copyWith(supplies: list)),
                 ),
                 const SizedBox(height: 20),
                 _Subheader(
@@ -623,4 +633,160 @@ class _IconAction extends StatelessWidget {
       icon: Icon(icon),
     );
   }
+}
+
+
+/// Lista de insumos (por peca) com busca no catalogo e atalho de criacao.
+/// Subtotal = quantidade por peca x quantidade do item x custo unitario.
+class _SupplyList extends StatelessWidget {
+  const _SupplyList({
+    required this.supplies,
+    required this.quantity,
+    required this.onChanged,
+  });
+
+  final List<SupplyUsageDraft> supplies;
+  final int quantity;
+  final ValueChanged<List<SupplyUsageDraft>> onChanged;
+
+  static Future<List<FormaSelectOption<Supply>>> _search(String q) async {
+    final page = await di<CatalogRepository>().supplies(
+      page: PageQuery(pageSize: 12, search: q.isEmpty ? null : q),
+    );
+    return [
+      for (final s in page.items.where((s) => s.isActive))
+        FormaSelectOption(
+          value: s,
+          label: s.name,
+          subtitle: '${Fmt.cents(s.unitCostCents)} / ${s.unit.label}',
+          leading: const Icon(Icons.category_outlined, size: 18),
+        ),
+    ];
+  }
+
+  void _set(int index, SupplyUsageDraft value) =>
+      onChanged([...supplies]..[index] = value);
+
+  SupplyUsageDraft _fromSupply(Supply s, double qty) => SupplyUsageDraft(
+    supplyId: s.id,
+    quantityPerPiece: qty,
+    label: s.name,
+    unit: s.unit.value,
+    unitCostCents: s.unitCostCents,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, s) in supplies.indexed)
+          Padding(
+            key: ValueKey('${s.supplyId}-$i'),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FormaCombobox<Supply>(
+                    hint: 'Buscar insumo...',
+                    value: s.supplyId.isEmpty
+                        ? null
+                        : FormaSelectOption(
+                            value: _placeholder(s),
+                            label: s.label,
+                            leading: const Icon(
+                              Icons.category_outlined,
+                              size: 18,
+                            ),
+                          ),
+                    search: _search,
+                    onChanged: (opt) {
+                      final picked = opt?.value;
+                      _set(
+                        i,
+                        picked == null
+                            ? SupplyUsageDraft(
+                                supplyId: '',
+                                quantityPerPiece: s.quantityPerPiece,
+                              )
+                            : _fromSupply(picked, s.quantityPerPiece),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 140,
+                  child: FormaNumberField(
+                    value: s.quantityPerPiece,
+                    decimals: 2,
+                    min: 0,
+                    suffixText: s.unit.isEmpty ? '/peça' : '${s.unit}/peça',
+                    onChanged: (v) => _set(
+                      i,
+                      s.copyWith(quantityPerPiece: (v ?? 0).toDouble()),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 92,
+                  child: Text(
+                    Fmt.cents(
+                      (s.quantityPerPiece * quantity * s.unitCostCents).round(),
+                    ),
+                    textAlign: TextAlign.right,
+                    style: typo.body13.copyWith(
+                      color: ext.textPrimary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _IconAction(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Remover insumo',
+                  onPressed: () => onChanged([...supplies]..removeAt(i)),
+                ),
+              ],
+            ),
+          ),
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => onChanged([
+                ...supplies,
+                const SupplyUsageDraft(supplyId: '', quantityPerPiece: 1),
+              ]),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Adicionar insumo'),
+            ),
+            TextButton.icon(
+              onPressed: () => unawaited(_createNew(context)),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+              label: const Text('Novo insumo'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createNew(BuildContext context) async {
+    final created = await showSupplyDialog(context);
+    if (created == null) return;
+    onChanged([...supplies, _fromSupply(created, 1)]);
+  }
+
+  /// O combobox exige um [Supply] como valor; para o item ja escolhido usamos
+  /// um objeto minimo com o mesmo id.
+  static Supply _placeholder(SupplyUsageDraft s) => Supply(
+    id: s.supplyId,
+    name: s.label,
+    unit: SupplyUnit.fromValue(s.unit),
+    unitCostCents: s.unitCostCents,
+  );
 }

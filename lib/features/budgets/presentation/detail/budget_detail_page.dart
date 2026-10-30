@@ -396,6 +396,31 @@ class _ItemCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (item.supplies.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final s in item.supplies)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+                    decoration: BoxDecoration(
+                      color: ext.appBackground,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: ext.border),
+                    ),
+                    child: Text(
+                      '${s.name} · ${Fmt.plain(s.quantityPerPiece)} '
+                      '${s.unit}/peça',
+                      style: typo.caption12Med.copyWith(
+                        color: ext.textPrimary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Divider(color: ext.border, height: 1),
           const SizedBox(height: 10),
@@ -405,6 +430,7 @@ class _ItemCard extends StatelessWidget {
             children: [
               for (final (label, cents) in [
                 ('Filamento', item.costs.filament),
+                ('Insumos', item.costs.supplies),
                 ('Desperdício', item.costs.waste),
                 ('Energia', item.costs.energy),
                 ('Máquina', item.costs.machine),

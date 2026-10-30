@@ -61,6 +61,77 @@ class Material extends Equatable {
   List<Object?> get props => [id, name, description, tempTable, tempExtruder];
 }
 
+/// Unidades de medida de um insumo (espelha o backend).
+enum SupplyUnit {
+  un('un', 'unidade'),
+  par('par', 'par'),
+  ml('ml', 'ml'),
+  g('g', 'g'),
+  m('m', 'm'),
+  cm('cm', 'cm'),
+  kg('kg', 'kg'),
+  l('l', 'litro');
+
+  const SupplyUnit(this.value, this.label);
+
+  final String value;
+  final String label;
+
+  static SupplyUnit fromValue(String? v) =>
+      values.firstWhere((u) => u.value == v, orElse: () => un);
+}
+
+/// Insumo nao impresso (LED, hidratante, argola...) cobrado por unidade.
+/// O custo entra no custo do item e recebe o mesmo overhead/margem; sem estoque.
+class Supply extends Equatable {
+  const Supply({
+    required this.id,
+    required this.name,
+    required this.unit,
+    required this.unitCostCents,
+    this.description,
+    this.isActive = true,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory Supply.fromJson(Json json) {
+    final j = json.unwrapData();
+    return Supply(
+      id: j.str('id'),
+      name: j.str('name'),
+      unit: SupplyUnit.fromValue(j.strOrNull('unit')),
+      // Custo unitario em centavos.
+      unitCostCents: j.integer('unit_cost'),
+      description: j.strOrNull('description'),
+      isActive: j.boolean('is_active', fallback: true),
+      createdAt: j.date('created_at'),
+      updatedAt: j.date('updated_at'),
+    );
+  }
+
+  final String id;
+  final String name;
+  final SupplyUnit unit;
+
+  /// Custo unitario em centavos.
+  final int unitCostCents;
+  final String? description;
+  final bool isActive;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  @override
+  List<Object?> get props => [
+    id,
+    name,
+    unit,
+    unitCostCents,
+    description,
+    isActive,
+  ];
+}
+
 /// Tipos de cor suportados pelo backend (`color_entity.go`).
 enum ColorType {
   solid('solid', 'Sólida'),
