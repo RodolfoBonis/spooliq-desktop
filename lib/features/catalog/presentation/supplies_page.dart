@@ -242,6 +242,7 @@ Future<Supply?> showSupplyDialog(
                 label: 'Conteúdo da embalagem',
                 value: packageSize,
                 min: 0,
+                max: 1000000,
                 decimals: 3,
                 suffixText: unit.value,
                 onChanged: (v) => setState(() => packageSize = v),

@@ -165,8 +165,12 @@ int supplyLineCostCents({
   required int packagePriceCents,
   required double packageSize,
 }) {
-  if (packageSize <= 0) return 0;
-  return (quantityPerPiece * productQuantity * packagePriceCents / packageSize)
+  // Mesma regra do backend: conteúdo inválido conta como embalagem de 1.
+  final size = packageSize <= 0 ? 1 : packageSize;
+  if (quantityPerPiece <= 0 || productQuantity <= 0 || packagePriceCents <= 0) {
+    return 0;
+  }
+  return (quantityPerPiece * productQuantity * packagePriceCents / size)
       .round();
 }
 

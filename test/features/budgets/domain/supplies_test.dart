@@ -157,7 +157,8 @@ void main() {
       );
     });
 
-    test('zero package size yields zero (never divides by zero)', () {
+    test('zero package size counts as 1, like the backend', () {
+      // 5 × 2 × 1000 / 1 = 10000 (nunca divide por zero).
       expect(
         supplyLineCostCents(
           quantityPerPiece: 5,
@@ -165,7 +166,7 @@ void main() {
           packagePriceCents: 1000,
           packageSize: 0,
         ),
-        0,
+        10000,
       );
     });
   });
