@@ -15,6 +15,7 @@ class CostSlice {
 /// Fatias de custo do orçamento (cores como na web).
 List<CostSlice> costSlices(Budget b) => [
   CostSlice('Filamentos', b.costs.filament, const Color(0xFF3B82F6)),
+  CostSlice('Insumos', b.costs.supplies, const Color(0xFF14B8A6)),
   CostSlice('Desperdício (AMS)', b.costs.waste, const Color(0xFFEF4444)),
   CostSlice('Energia', b.costs.energy, const Color(0xFFEAB308)),
   CostSlice('Máquina', b.costs.machine, const Color(0xFF06B6D4)),

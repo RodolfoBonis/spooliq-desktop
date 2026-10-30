@@ -238,6 +238,7 @@ class Operations extends Equatable {
       rejectionRateChange: j.dbl('rejection_rate_change'),
       breakdown: {
         'Filamento': c.dbl('filament_pct'),
+        'Insumos': c.dbl('supplies_pct'),
         'Desperdício': c.dbl('waste_pct'),
         'Energia': c.dbl('energy_pct'),
         'Máquina': c.dbl('machine_pct'),

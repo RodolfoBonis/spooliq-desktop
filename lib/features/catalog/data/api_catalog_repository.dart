@@ -68,6 +68,46 @@ class ApiCatalogRepository implements CatalogRepository {
   Future<void> deleteMaterial(String id) => _api.delete('/materials/$id');
 
   @override
+  Future<Paginated<Supply>> supplies({
+    PageQuery page = const PageQuery(pageSize: 100),
+    bool? isActive,
+  }) async => Paginated.fromJson(
+    await _api.get(
+      '/supplies',
+      query: {
+        ...page.toQuery(), // busca vai como `q`, igual às outras listas
+        'is_active': ?isActive,
+      },
+    ),
+    Supply.fromJson,
+  );
+
+  @override
+  Future<Supply> saveSupply({
+    required String name,
+    required SupplyUnit unit,
+    required int unitCostCents,
+    String? id,
+    String? description,
+    bool? isActive,
+  }) async {
+    final body = compactJson({
+      'name': name.trim(),
+      'unit': unit.value,
+      'unit_cost': unitCostCents,
+      'description': description?.trim() ?? '',
+      'is_active': isActive,
+    });
+    final json = id == null
+        ? await _api.postJson('/supplies', body: body)
+        : await _api.putJson('/supplies/$id', body: body);
+    return Supply.fromJson(json);
+  }
+
+  @override
+  Future<void> deleteSupply(String id) => _api.delete('/supplies/$id');
+
+  @override
   Future<Paginated<Filament>> filaments({
     PageQuery page = const PageQuery(),
     FilamentFilter filter = const FilamentFilter(),

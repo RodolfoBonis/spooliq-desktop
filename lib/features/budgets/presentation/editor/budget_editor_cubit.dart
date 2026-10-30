@@ -269,6 +269,7 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
       // Sem isto, os valores de UMA impressão virariam totais na cópia.
       unitsPerPrint: source.unitsPerPrint,
       filaments: source.filaments,
+      supplies: source.supplies,
     );
     return d.copyWith(items: [...d.items]..insert(index + 1, copy));
   });

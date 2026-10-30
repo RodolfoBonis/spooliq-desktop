@@ -33,6 +33,47 @@ class FilamentUsageDraft extends Equatable {
   List<Object?> get props => [filamentId, grams, label, colorHex];
 }
 
+/// Insumo escolhido para um item, por peca. [label]/[unit]/[unitCostCents]
+/// sao so para a UI (subtotal e rotulo); o envio leva apenas id e quantidade.
+class SupplyUsageDraft extends Equatable {
+  const SupplyUsageDraft({
+    required this.supplyId,
+    required this.quantityPerPiece,
+    this.label = '',
+    this.unit = '',
+    this.unitCostCents = 0,
+  });
+
+  final String supplyId;
+  final double quantityPerPiece;
+  final String label;
+  final String unit;
+  final int unitCostCents;
+
+  SupplyUsageDraft copyWith({
+    String? supplyId,
+    double? quantityPerPiece,
+    String? label,
+    String? unit,
+    int? unitCostCents,
+  }) => SupplyUsageDraft(
+    supplyId: supplyId ?? this.supplyId,
+    quantityPerPiece: quantityPerPiece ?? this.quantityPerPiece,
+    label: label ?? this.label,
+    unit: unit ?? this.unit,
+    unitCostCents: unitCostCents ?? this.unitCostCents,
+  );
+
+  @override
+  List<Object?> get props => [
+    supplyId,
+    quantityPerPiece,
+    label,
+    unit,
+    unitCostCents,
+  ];
+}
+
 /// Item em edição.
 class BudgetItemDraft extends Equatable {
   const BudgetItemDraft({
@@ -53,6 +94,7 @@ class BudgetItemDraft extends Equatable {
     this.model3dName,
     this.unitsPerPrint,
     this.filaments = const [],
+    this.supplies = const [],
   });
 
   /// Reconstrói o item salvo. Com [BudgetItem.unitsPerPrint], a API guarda
@@ -105,6 +147,16 @@ class BudgetItemDraft extends Equatable {
             colorHex: f.colorHex,
           ),
       ],
+      supplies: [
+        for (final s in item.supplies)
+          SupplyUsageDraft(
+            supplyId: s.supplyId,
+            quantityPerPiece: s.quantityPerPiece,
+            label: s.name,
+            unit: s.unit,
+            unitCostCents: s.unitCostCents,
+          ),
+      ],
     );
   }
 
@@ -130,6 +182,7 @@ class BudgetItemDraft extends Equatable {
   /// escalados para [quantity] ao enviar (ver [PrintBatch]).
   final int? unitsPerPrint;
   final List<FilamentUsageDraft> filaments;
+  final List<SupplyUsageDraft> supplies;
 
   /// Lote para a quantidade atual; null no modo "valores totais".
   PrintBatch? get batch => unitsPerPrint == null || unitsPerPrint! <= 0
@@ -179,6 +232,7 @@ class BudgetItemDraft extends Equatable {
     String? Function()? model3dName,
     int? Function()? unitsPerPrint,
     List<FilamentUsageDraft>? filaments,
+    List<SupplyUsageDraft>? supplies,
   }) => BudgetItemDraft(
     key: key,
     productName: productName ?? this.productName,
@@ -197,6 +251,7 @@ class BudgetItemDraft extends Equatable {
     model3dName: model3dName == null ? this.model3dName : model3dName(),
     unitsPerPrint: unitsPerPrint == null ? this.unitsPerPrint : unitsPerPrint(),
     filaments: filaments ?? this.filaments,
+    supplies: supplies ?? this.supplies,
   );
 
   Json toJson(int order) {
@@ -245,6 +300,16 @@ class BudgetItemDraft extends Equatable {
             'order': i + 1,
           },
       ],
+      // Insumos sao por peca: NUNCA escalam com PrintBatch. Sempre enviamos a
+      // lista (vazia quando nao ha nenhum) para que limpar insumos persista.
+      'supplies': [
+        for (final s in supplies)
+          if (s.supplyId.isNotEmpty && s.quantityPerPiece > 0)
+            {
+              'supply_id': s.supplyId,
+              'quantity_per_piece': s.quantityPerPiece,
+            },
+      ],
     });
   }
 
@@ -267,6 +332,7 @@ class BudgetItemDraft extends Equatable {
     model3dName,
     unitsPerPrint,
     filaments,
+    supplies,
   ];
 }
 
@@ -371,6 +437,11 @@ class BudgetDraft extends Equatable {
       if (item.quantity <= 0) 'item.$i.quantity': 'Quantidade inválida.',
       if (!item.filaments.any((f) => f.filamentId.isNotEmpty && f.grams > 0))
         'item.$i.filaments': 'Adicione ao menos um filamento com quantidade.',
+      // Um insumo escolhido sem quantidade seria descartado em silêncio.
+      if (item.supplies.any(
+        (s) => s.supplyId.isNotEmpty && s.quantityPerPiece <= 0,
+      ))
+        'item.$i.supplies': 'Informe a quantidade por peça de cada insumo.',
     },
   };
 

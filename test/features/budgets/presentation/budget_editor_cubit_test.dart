@@ -176,6 +176,55 @@ void main() {
   );
 
   blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'duplicating an item keeps its supplies',
+    build: build,
+    act: (c) async {
+      await c.load();
+      c
+        ..updateItem(
+          0,
+          (_) => filled.copyWith(
+            supplies: const [
+              SupplyUsageDraft(supplyId: 's-1', quantityPerPiece: 2),
+            ],
+          ),
+        )
+        ..duplicateItem(0);
+    },
+    verify: (c) {
+      final copy = c.state.draft.items.last;
+      expect(copy.supplies.single.supplyId, 's-1');
+      expect(copy.supplies.single.quantityPerPiece, 2);
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'adding a supply triggers a new preview',
+    build: build,
+    setUp: () => when(
+      () => budgets.preview(any()),
+    ).thenAnswer((_) async => Budget.fromJson(budgetJson())),
+    act: (c) async {
+      await c.load();
+      c.updateItem(0, (_) => filled);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      c.updateItem(
+        0,
+        (i) => i.copyWith(
+          supplies: const [
+            SupplyUsageDraft(supplyId: 's-1', quantityPerPiece: 1),
+          ],
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    },
+    verify: (c) {
+      verify(() => budgets.preview(any())).called(2);
+      expect(c.state.draft.items.single.supplies, hasLength(1));
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
     'a plain G-code import keeps total mode and the quantity',
     build: build,
     act: (c) async {
