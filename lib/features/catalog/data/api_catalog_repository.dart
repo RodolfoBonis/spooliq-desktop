@@ -75,10 +75,7 @@ class ApiCatalogRepository implements CatalogRepository {
     await _api.get(
       '/supplies',
       query: {
-        ...page.toQuery(),
-        // O backend aceita `search`; mantemos `q` por consistencia com o resto.
-        if (page.search != null && page.search!.trim().isNotEmpty)
-          'search': page.search!.trim(),
+        ...page.toQuery(), // busca vai como `q`, igual às outras listas
         'is_active': ?isActive,
       },
     ),

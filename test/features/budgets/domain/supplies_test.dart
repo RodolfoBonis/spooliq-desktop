@@ -133,4 +133,41 @@ void main() {
       ]);
     });
   });
+
+  test('a chosen supply without quantity blocks saving', () {
+    const draft = BudgetDraft(
+      name: 'Kit',
+      customerId: 'c1',
+      items: [
+        BudgetItemDraft(
+          key: 0,
+          productName: 'Luminária',
+          filaments: [FilamentUsageDraft(filamentId: 'f1', grams: 10)],
+          supplies: [
+            SupplyUsageDraft(
+              supplyId: 's1',
+              quantityPerPiece: 0,
+              label: 'LED',
+              unit: 'un',
+              unitCostCents: 50,
+            ),
+          ],
+        ),
+      ],
+    );
+    expect(
+      draft.validate()['item.0.supplies'],
+      'Informe a quantidade por peça de cada insumo.',
+    );
+    final ok = draft.copyWith(
+      items: [
+        draft.items.single.copyWith(
+          supplies: [
+            draft.items.single.supplies.single.copyWith(quantityPerPiece: 1),
+          ],
+        ),
+      ],
+    );
+    expect(ok.validate().containsKey('item.0.supplies'), isFalse);
+  });
 }

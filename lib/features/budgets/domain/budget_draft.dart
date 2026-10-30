@@ -437,6 +437,11 @@ class BudgetDraft extends Equatable {
       if (item.quantity <= 0) 'item.$i.quantity': 'Quantidade inválida.',
       if (!item.filaments.any((f) => f.filamentId.isNotEmpty && f.grams > 0))
         'item.$i.filaments': 'Adicione ao menos um filamento com quantidade.',
+      // Um insumo escolhido sem quantidade seria descartado em silêncio.
+      if (item.supplies.any(
+        (s) => s.supplyId.isNotEmpty && s.quantityPerPiece <= 0,
+      ))
+        'item.$i.supplies': 'Informe a quantidade por peça de cada insumo.',
     },
   };
 

@@ -232,6 +232,7 @@ class ItemEditor extends StatelessWidget {
                 _SupplyList(
                   supplies: item.supplies,
                   quantity: item.quantity,
+                  error: err('supplies'),
                   onChanged: (list) =>
                       onChanged((i) => i.copyWith(supplies: list)),
                 ),
@@ -635,7 +636,6 @@ class _IconAction extends StatelessWidget {
   }
 }
 
-
 /// Lista de insumos (por peca) com busca no catalogo e atalho de criacao.
 /// Subtotal = quantidade por peca x quantidade do item x custo unitario.
 class _SupplyList extends StatelessWidget {
@@ -643,18 +643,22 @@ class _SupplyList extends StatelessWidget {
     required this.supplies,
     required this.quantity,
     required this.onChanged,
+    this.error,
   });
 
   final List<SupplyUsageDraft> supplies;
   final int quantity;
+  final String? error;
   final ValueChanged<List<SupplyUsageDraft>> onChanged;
 
   static Future<List<FormaSelectOption<Supply>>> _search(String q) async {
     final page = await di<CatalogRepository>().supplies(
       page: PageQuery(pageSize: 12, search: q.isEmpty ? null : q),
+      // Filtra no servidor: inativos não ocupam as vagas da busca.
+      isActive: true,
     );
     return [
-      for (final s in page.items.where((s) => s.isActive))
+      for (final s in page.items)
         FormaSelectOption(
           value: s,
           label: s.name,
@@ -724,6 +728,12 @@ class _SupplyList extends StatelessWidget {
                     value: s.quantityPerPiece,
                     decimals: 2,
                     min: 0,
+                    errorText:
+                        error != null &&
+                            s.supplyId.isNotEmpty &&
+                            s.quantityPerPiece <= 0
+                        ? 'Obrigatório'
+                        : null,
                     suffixText: s.unit.isEmpty ? '/peça' : '${s.unit}/peça',
                     onChanged: (v) => _set(
                       i,
@@ -771,6 +781,8 @@ class _SupplyList extends StatelessWidget {
             ),
           ],
         ),
+        if (error != null)
+          Text(error!, style: typo.caption12.copyWith(color: ext.errorColor)),
       ],
     );
   }
