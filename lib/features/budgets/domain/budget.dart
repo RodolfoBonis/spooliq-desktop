@@ -110,22 +110,38 @@ class BudgetItemSupply extends Equatable {
     required this.unitCostCents,
     required this.quantityPerPiece,
     required this.totalCents,
+    this.packageSize = 1,
+    this.packagePriceCents = 0,
   });
 
-  factory BudgetItemSupply.fromJson(Json json) => BudgetItemSupply(
-    supplyId: json.str('supply_id'),
-    name: json.str('name'),
-    unit: json.str('unit'),
-    unitCostCents: json.integer('unit_cost'),
-    quantityPerPiece: json.dbl('quantity_per_piece'),
-    totalCents: json.integer('total'),
-  );
+  factory BudgetItemSupply.fromJson(Json json) {
+    final unitCost = json.integer('unit_cost');
+    // Linhas antigas nao tem embalagem: conteudo 1, preco = custo unitario.
+    final packageSize = json.dblOrNull('package_size') ?? 1;
+    final packagePrice = json.intOrNull('package_price') ?? unitCost;
+    return BudgetItemSupply(
+      supplyId: json.str('supply_id'),
+      name: json.str('name'),
+      unit: json.str('unit'),
+      unitCostCents: unitCost,
+      quantityPerPiece: json.dbl('quantity_per_piece'),
+      totalCents: json.integer('total'),
+      packageSize: packageSize <= 0 ? 1 : packageSize,
+      packagePriceCents: packagePrice,
+    );
+  }
 
   final String supplyId;
   final String name;
   final String unit;
   final int unitCostCents;
   final double quantityPerPiece;
+
+  /// Conteudo da embalagem, na [unit] (ex.: 400 ml).
+  final double packageSize;
+
+  /// Preco da embalagem inteira, em centavos (ex.: 6990 = R\$ 69,90).
+  final int packagePriceCents;
 
   /// Custo total do insumo para o item inteiro (centavos).
   final int totalCents;

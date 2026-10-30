@@ -18,7 +18,16 @@ import 'package:spooliq_desktop/features/auth/presentation/session_cubit.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/domain/catalog_repository.dart';
 
-/// Insumos não impressos (LED, hidratante, argola…) cobrados por unidade.
+/// "400 ml · R\$ 69,90" — conteúdo e preço da embalagem de um insumo.
+String supplyPackageLabel(Supply s) =>
+    '${Fmt.qty(s.packageSize)} ${s.unit.value} · '
+    '${Fmt.cents(s.packagePriceCents)}';
+
+/// "R\$ 0,1748/ml" — custo por unidade de um insumo.
+String supplyPerUnitLabel(Supply s) =>
+    '${Fmt.unitPrice(s.costPerUnit)}/${s.unit.value}';
+
+/// Insumos não impressos (LED, hidratante, argola…) cobrados por embalagem.
 class SuppliesPage extends StatelessWidget {
   const SuppliesPage({super.key});
 
@@ -94,17 +103,17 @@ class _SuppliesView extends StatelessWidget {
             ),
           ),
           FormaColumn(
-            id: 'unit',
-            label: 'Unidade',
-            width: 110,
-            cellBuilder: (_, s) => Text(s.unit.label, style: muted),
+            id: 'package',
+            label: 'Embalagem',
+            width: 170,
+            cellBuilder: (_, s) => Text(supplyPackageLabel(s), style: muted),
           ),
           FormaColumn(
             id: 'unit_cost',
-            label: 'Custo unit.',
-            width: 120,
+            label: 'Por unidade',
+            width: 130,
             cellBuilder: (_, s) => Text(
-              Fmt.cents(s.unitCostCents),
+              supplyPerUnitLabel(s),
               style: typo.body14.copyWith(
                 color: ext.textPrimary,
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -173,7 +182,9 @@ class _SuppliesView extends StatelessWidget {
 }
 
 /// Diálogo de criação/edição de insumo, reutilizado pelo editor de orçamento.
-/// Converte o custo unitário de R\$ para centavos. Retorna o [Supply] salvo.
+/// O usuário informa o conteúdo da embalagem (na unidade escolhida) e o preço
+/// pago por ela em R\$; o custo por unidade é derivado e exibido ao vivo.
+/// Retorna o [Supply] salvo.
 Future<Supply?> showSupplyDialog(
   BuildContext context, {
   Supply? supply,
@@ -181,67 +192,114 @@ Future<Supply?> showSupplyDialog(
   final name = TextEditingController(text: supply?.name);
   final description = TextEditingController(text: supply?.description);
   var unit = supply?.unit ?? SupplyUnit.un;
-  num? unitCost = supply == null ? null : supply.unitCostCents / 100;
+  num? packageSize = supply?.packageSize;
+  num? packagePrice = supply == null ? null : supply.packagePriceCents / 100;
   var isActive = supply?.isActive ?? true;
+
+  // Para avisar que recalcular orçamentos reinterpreta a quantidade por peça.
+  final originalUnit = supply?.unit;
+  final originalPackageSize = supply?.packageSize;
 
   return showFormDialog<Supply>(
     context,
     title: supply == null ? 'Novo insumo' : 'Editar insumo',
-    fields: (setState) => [
-      FormaTextField(
-        label: 'Nome',
-        controller: name,
-        autofocus: true,
-        validator: requiredValidator,
-      ),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 160,
-            child: FormaSelect<SupplyUnit>(
-              label: 'Unidade',
-              value: unit,
-              options: [
-                for (final u in SupplyUnit.values)
-                  FormaSelectOption(value: u, label: u.label),
-              ],
-              onChanged: (v) => setState(() => unit = v ?? unit),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FormaNumberField(
-              label: 'Custo unitário',
-              value: unitCost,
-              min: 0,
-              decimals: 2,
-              prefixText: r'R$',
-              onChanged: (v) => unitCost = v,
-            ),
-          ),
-        ],
-      ),
-      FormaTextField(
-        label: 'Descrição',
-        controller: description,
-        maxLines: 2,
-      ),
-      if (supply != null)
-        FormaCheckbox(
-          value: isActive,
-          label: 'Ativo',
-          description: 'Inativos não aparecem no editor de orçamentos',
-          onChanged: (v) => setState(() => isActive = v),
+    fields: (setState) {
+      final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+      final typo = context.formaTypography;
+      final size = (packageSize ?? 0).toDouble();
+      final priceCents = ((packagePrice ?? 0) * 100).round();
+      final perUnit = size <= 0 ? 0.0 : priceCents / size;
+      final changedUnitOrSize =
+          supply != null &&
+          (unit != originalUnit ||
+              packageSize?.toDouble() != originalPackageSize);
+
+      return [
+        FormaTextField(
+          label: 'Nome',
+          controller: name,
+          autofocus: true,
+          validator: requiredValidator,
         ),
-    ],
-    onSubmit: () => di<CatalogRepository>().saveSupply(
-      id: supply?.id,
-      name: name.text,
-      unit: unit,
-      unitCostCents: ((unitCost ?? 0) * 100).round(),
-      description: description.text,
-      isActive: supply == null ? null : isActive,
-    ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 160,
+              child: FormaSelect<SupplyUnit>(
+                label: 'Unidade',
+                value: unit,
+                options: [
+                  for (final u in SupplyUnit.values)
+                    FormaSelectOption(value: u, label: u.label),
+                ],
+                onChanged: (v) => setState(() => unit = v ?? unit),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FormaNumberField(
+                label: 'Conteúdo da embalagem',
+                value: packageSize,
+                min: 0,
+                max: 1000000,
+                decimals: 3,
+                suffixText: unit.value,
+                onChanged: (v) => setState(() => packageSize = v),
+              ),
+            ),
+          ],
+        ),
+        FormaNumberField(
+          label: 'Preço da embalagem',
+          value: packagePrice,
+          min: 0,
+          decimals: 2,
+          prefixText: r'R$',
+          onChanged: (v) => setState(() => packagePrice = v),
+        ),
+        if (size > 0 && priceCents > 0)
+          Text(
+            '= ${Fmt.unitPrice(perUnit)} por ${unit.value}',
+            style: typo.body13.copyWith(color: ext.textMuted),
+          ),
+        if (changedUnitOrSize)
+          Text(
+            'Orçamentos que usam este insumo passam a interpretar a '
+            'quantidade por peça na nova unidade ao recalcular.',
+            style: typo.caption12.copyWith(color: ext.warningText),
+          ),
+        FormaTextField(
+          label: 'Descrição',
+          controller: description,
+          maxLines: 2,
+        ),
+        if (supply != null)
+          FormaCheckbox(
+            value: isActive,
+            label: 'Ativo',
+            description: 'Inativos não aparecem no editor de orçamentos',
+            onChanged: (v) => setState(() => isActive = v),
+          ),
+      ];
+    },
+    onSubmit: () {
+      // O custo por unidade divide pelo conteúdo: precisa ser maior que zero.
+      final size = (packageSize ?? 0).toDouble();
+      if (size <= 0) {
+        throw const ValidationError(
+          'Informe o conteúdo da embalagem (ex.: 400 ml ou 100 un).',
+        );
+      }
+      return di<CatalogRepository>().saveSupply(
+        id: supply?.id,
+        name: name.text,
+        unit: unit,
+        packageSize: size,
+        packagePriceCents: ((packagePrice ?? 0) * 100).round(),
+        description: description.text,
+        isActive: supply == null ? null : isActive,
+      );
+    },
   );
 }

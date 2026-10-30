@@ -81,7 +81,9 @@ enum SupplyUnit {
       values.firstWhere((u) => u.value == v, orElse: () => un);
 }
 
-/// Insumo nao impresso (LED, hidratante, argola...) cobrado por unidade.
+/// Insumo nao impresso (LED, hidratante, argola...) cobrado por embalagem.
+/// O usuario cadastra o conteudo da embalagem ([packageSize], na [unit]) e o
+/// preco pago por ela ([packagePriceCents]); o custo por unidade e derivado.
 /// O custo entra no custo do item e recebe o mesmo overhead/margem; sem estoque.
 class Supply extends Equatable {
   const Supply({
@@ -89,6 +91,8 @@ class Supply extends Equatable {
     required this.name,
     required this.unit,
     required this.unitCostCents,
+    this.packageSize = 1,
+    this.packagePriceCents = 0,
     this.description,
     this.isActive = true,
     this.createdAt,
@@ -97,12 +101,19 @@ class Supply extends Equatable {
 
   factory Supply.fromJson(Json json) {
     final j = json.unwrapData();
+    // Custo unitario legado em centavos.
+    final unitCost = j.integer('unit_cost');
+    // Insumos antigos nao tem campos de embalagem: cada unidade e uma embalagem
+    // (conteudo 1) cujo preco e o proprio custo unitario.
+    final packageSize = j.dblOrNull('package_size') ?? 1;
+    final packagePrice = j.intOrNull('package_price') ?? unitCost;
     return Supply(
       id: j.str('id'),
       name: j.str('name'),
       unit: SupplyUnit.fromValue(j.strOrNull('unit')),
-      // Custo unitario em centavos.
-      unitCostCents: j.integer('unit_cost'),
+      unitCostCents: unitCost,
+      packageSize: packageSize <= 0 ? 1 : packageSize,
+      packagePriceCents: packagePrice,
       description: j.strOrNull('description'),
       isActive: j.boolean('is_active', fallback: true),
       createdAt: j.date('created_at'),
@@ -114,12 +125,23 @@ class Supply extends Equatable {
   final String name;
   final SupplyUnit unit;
 
-  /// Custo unitario em centavos.
+  /// Custo unitario em centavos (derivado pelo backend de [packagePriceCents] /
+  /// [packageSize]; mantido por compatibilidade).
   final int unitCostCents;
+
+  /// Conteudo da embalagem, na [unit] (ex.: 400 ml).
+  final double packageSize;
+
+  /// Preco pago pela embalagem inteira, em centavos (ex.: 6990 = R\$ 69,90).
+  final int packagePriceCents;
   final String? description;
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// Custo por unidade em centavos (fracionario). Ex.: 6990 / 400 = 17,475.
+  double get costPerUnit =>
+      packageSize <= 0 ? 0 : packagePriceCents / packageSize;
 
   @override
   List<Object?> get props => [
@@ -127,9 +149,29 @@ class Supply extends Equatable {
     name,
     unit,
     unitCostCents,
+    packageSize,
+    packagePriceCents,
     description,
     isActive,
   ];
+}
+
+/// Custo (centavos, arredondado uma unica vez) de um insumo usado em um item:
+/// `quantidade por peca x quantidade de pecas x preco da embalagem / conteudo`.
+/// Funcao pura compartilhada pelo editor (subtotal ao vivo) e pelo dominio.
+int supplyLineCostCents({
+  required double quantityPerPiece,
+  required int productQuantity,
+  required int packagePriceCents,
+  required double packageSize,
+}) {
+  // Mesma regra do backend: conteúdo inválido conta como embalagem de 1.
+  final size = packageSize <= 0 ? 1 : packageSize;
+  if (quantityPerPiece <= 0 || productQuantity <= 0 || packagePriceCents <= 0) {
+    return 0;
+  }
+  return (quantityPerPiece * productQuantity * packagePriceCents / size)
+      .round();
 }
 
 /// Tipos de cor suportados pelo backend (`color_entity.go`).

@@ -42,6 +42,8 @@ class SupplyUsageDraft extends Equatable {
     this.label = '',
     this.unit = '',
     this.unitCostCents = 0,
+    this.packageSize = 1,
+    this.packagePriceCents = 0,
   });
 
   final String supplyId;
@@ -50,18 +52,28 @@ class SupplyUsageDraft extends Equatable {
   final String unit;
   final int unitCostCents;
 
+  /// Conteudo da embalagem, na [unit] (ex.: 400 ml); so para a UI.
+  final double packageSize;
+
+  /// Preco da embalagem inteira em centavos; usado no subtotal ao vivo.
+  final int packagePriceCents;
+
   SupplyUsageDraft copyWith({
     String? supplyId,
     double? quantityPerPiece,
     String? label,
     String? unit,
     int? unitCostCents,
+    double? packageSize,
+    int? packagePriceCents,
   }) => SupplyUsageDraft(
     supplyId: supplyId ?? this.supplyId,
     quantityPerPiece: quantityPerPiece ?? this.quantityPerPiece,
     label: label ?? this.label,
     unit: unit ?? this.unit,
     unitCostCents: unitCostCents ?? this.unitCostCents,
+    packageSize: packageSize ?? this.packageSize,
+    packagePriceCents: packagePriceCents ?? this.packagePriceCents,
   );
 
   @override
@@ -71,6 +83,8 @@ class SupplyUsageDraft extends Equatable {
     label,
     unit,
     unitCostCents,
+    packageSize,
+    packagePriceCents,
   ];
 }
 
@@ -155,6 +169,8 @@ class BudgetItemDraft extends Equatable {
             label: s.name,
             unit: s.unit,
             unitCostCents: s.unitCostCents,
+            packageSize: s.packageSize,
+            packagePriceCents: s.packagePriceCents,
           ),
       ],
     );

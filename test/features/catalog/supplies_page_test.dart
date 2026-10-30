@@ -70,33 +70,91 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  testWidgets(r'create dialog converts R$ to cents', (tester) async {
+  Finder numberField(int index) => find.descendant(
+    of: find.byType(FormaNumberField).at(index),
+    matching: find.byType(TextField),
+  );
+
+  testWidgets(
+    'create dialog converts price to cents and shows per-unit cost',
+    (
+      tester,
+    ) async {
+      when(
+        () => catalog.supplies(page: any(named: 'page')),
+      ).thenAnswer((_) async => _page(const []));
+      when(
+        () => catalog.saveSupply(
+          name: any(named: 'name'),
+          unit: any(named: 'unit'),
+          packageSize: any(named: 'packageSize'),
+          packagePriceCents: any(named: 'packagePriceCents'),
+          description: any(named: 'description'),
+          isActive: any(named: 'isActive'),
+        ),
+      ).thenAnswer(
+        (_) async => const Supply(
+          id: 's-new',
+          name: 'Loção',
+          unit: SupplyUnit.un,
+          unitCostCents: 17,
+          packageSize: 400,
+          packagePriceCents: 6990,
+        ),
+      );
+
+      await pump(tester);
+      expect(find.text('Nenhum insumo cadastrado'), findsOneWidget);
+
+      await tester.tap(find.text('Novo insumo'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.enterText(
+        find
+            .descendant(
+              of: find.byType(FormaDialog),
+              matching: find.byType(TextFormField),
+            )
+            .first,
+        'Loção',
+      );
+      // Conteúdo da embalagem (primeiro número) e preço (segundo número).
+      await tester.enterText(numberField(0), '400');
+      await tester.enterText(numberField(1), '69,90');
+      await tester.pump();
+
+      // Custo por unidade derivado: 6990 / 400 = R$ 0,1748.
+      expect(find.textContaining(r'R$ 0,1748'), findsOneWidget);
+
+      await tester.tap(find.text('Salvar'));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      verify(
+        () => catalog.saveSupply(
+          name: 'Loção',
+          unit: SupplyUnit.un,
+          packageSize: 400,
+          packagePriceCents: 6990,
+          description: any(named: 'description'),
+          isActive: any(named: 'isActive'),
+        ),
+      ).called(1);
+      expect(find.text('Loção'), findsWidgets);
+      // Drena o toast pendente para não vazar timers.
+      await tester.pump(const Duration(seconds: 5));
+    },
+  );
+
+  testWidgets('an empty package size is rejected before saving', (
+    tester,
+  ) async {
     when(
       () => catalog.supplies(page: any(named: 'page')),
     ).thenAnswer((_) async => _page(const []));
-    when(
-      () => catalog.saveSupply(
-        name: any(named: 'name'),
-        unit: any(named: 'unit'),
-        unitCostCents: any(named: 'unitCostCents'),
-        description: any(named: 'description'),
-        isActive: any(named: 'isActive'),
-      ),
-    ).thenAnswer(
-      (_) async => const Supply(
-        id: 's-new',
-        name: 'LED 5mm',
-        unit: SupplyUnit.un,
-        unitCostCents: 1250,
-      ),
-    );
 
     await pump(tester);
-    expect(find.text('Nenhum insumo cadastrado'), findsOneWidget);
-
     await tester.tap(find.text('Novo insumo'));
     await tester.pump(const Duration(milliseconds: 400));
-
     await tester.enterText(
       find
           .descendant(
@@ -104,29 +162,62 @@ void main() {
             matching: find.byType(TextFormField),
           )
           .first,
-      'LED 5mm',
+      'Loção',
     );
-    await tester.enterText(
-      find.descendant(
-        of: find.byType(FormaNumberField),
-        matching: find.byType(TextField),
-      ),
-      '12,50',
-    );
+    await tester.enterText(numberField(1), '69,90');
     await tester.tap(find.text('Salvar'));
     await tester.pump(const Duration(milliseconds: 400));
 
-    verify(
+    expect(
+      find.textContaining('Informe o conteúdo da embalagem'),
+      findsOneWidget,
+    );
+    verifyNever(
       () => catalog.saveSupply(
-        name: 'LED 5mm',
-        unit: SupplyUnit.un,
-        unitCostCents: 1250,
+        id: any(named: 'id'),
+        name: any(named: 'name'),
+        unit: any(named: 'unit'),
+        packageSize: any(named: 'packageSize'),
+        packagePriceCents: any(named: 'packagePriceCents'),
         description: any(named: 'description'),
         isActive: any(named: 'isActive'),
       ),
-    ).called(1);
-    expect(find.text('LED 5mm'), findsOneWidget);
-    // Drena o toast pendente para não vazar timers.
-    await tester.pump(const Duration(seconds: 5));
+    );
+  });
+
+  testWidgets('edit dialog warns when package size changes', (tester) async {
+    when(() => catalog.supplies(page: any(named: 'page'))).thenAnswer(
+      (_) async => _page(const [
+        Supply(
+          id: 's-1',
+          name: 'Loção',
+          unit: SupplyUnit.ml,
+          unitCostCents: 17,
+          packageSize: 400,
+          packagePriceCents: 6990,
+        ),
+      ]),
+    );
+
+    await pump(tester);
+    // Abre o diálogo de edição tocando na linha do insumo.
+    await tester.tap(find.text('Loção').first);
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Custo por unidade já aparece ao abrir (dentro do diálogo).
+    expect(
+      find.descendant(
+        of: find.byType(FormaDialog),
+        matching: find.textContaining(r'R$ 0,1748'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('passam a interpretar'), findsNothing);
+
+    // Altera o conteúdo da embalagem → dispara o aviso de recálculo.
+    await tester.enterText(numberField(0), '500');
+    await tester.pump();
+
+    expect(find.textContaining('passam a interpretar'), findsOneWidget);
   });
 }
