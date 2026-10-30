@@ -411,7 +411,7 @@ class _ItemCard extends StatelessWidget {
                       border: Border.all(color: ext.border),
                     ),
                     child: Text(
-                      '${s.name} · ${Fmt.plain(s.quantityPerPiece)} '
+                      '${s.name} · ${Fmt.qty(s.quantityPerPiece)} '
                       '${s.unit}/peça',
                       style: typo.caption12Med.copyWith(
                         color: ext.textPrimary,

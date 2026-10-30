@@ -31,10 +31,15 @@ abstract interface class CatalogRepository {
     PageQuery page = const PageQuery(pageSize: 100),
     bool? isActive,
   });
+
+  /// Cadastra/atualiza um insumo. O custo por unidade é derivado de
+  /// [packagePriceCents] / [packageSize] (uma embalagem de conteúdo
+  /// [packageSize] na unidade do insumo custa [packagePriceCents]).
   Future<Supply> saveSupply({
     required String name,
     required SupplyUnit unit,
-    required int unitCostCents,
+    required double packageSize,
+    required int packagePriceCents,
     String? id,
     String? description,
     bool? isActive,

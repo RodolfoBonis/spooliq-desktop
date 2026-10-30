@@ -44,6 +44,7 @@ void main() {
           label: 'LED 5mm',
           unit: 'un',
           unitCostCents: 500,
+          packagePriceCents: 500,
         ),
       ],
     );
@@ -68,8 +69,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('Insumos'), findsOneWidget);
-    // Subtotal = 2 un/peça × 3 peças × R$5,00 = R$15,00.
-    expect(find.text(Fmt.cents(3000)), findsOneWidget);
+    // Sufixo da unidade por peça na coluna de quantidade.
+    expect(find.textContaining('un/peça'), findsOneWidget);
+    // Subtotal = 2 un/peça × 3 peças × R\$ 5,00 (embalagem 500/1) = R\$ 30,00.
+    expect(find.textContaining('2 un × 3 peças = 6 un'), findsOneWidget);
+    expect(find.textContaining(Fmt.cents(3000)), findsOneWidget);
 
     // Adiciona uma linha vazia de insumo.
     await tester.tap(find.text('Adicionar insumo'));

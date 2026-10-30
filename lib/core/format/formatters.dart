@@ -34,6 +34,29 @@ abstract final class Fmt {
 
   static String plain(num? value) => _decimal.format(value ?? 0);
 
+  /// Quantidade com até [decimals] casas, sem zeros à direita ("10", "10,5").
+  static String qty(num? value, {int decimals = 3}) {
+    final text = number(value, decimals: decimals);
+    if (!text.contains(',')) return text;
+    final parts = text.split(',');
+    final dec = parts[1].replaceAll(RegExp(r'0+$'), '');
+    return dec.isEmpty ? parts[0] : '${parts[0]},$dec';
+  }
+
+  /// Custo por unidade em centavos (fracionários) → "R$ 0,1748" (2–4 casas,
+  /// sem zeros supérfluos). Ex.: 17,475 centavos → "R$ 0,1748".
+  static String unitPrice(num? centsPerUnit) {
+    final reais = (centsPerUnit ?? 0) / 100;
+    final text = number(reais, decimals: 4);
+    if (!text.contains(',')) return 'R\$ $text';
+    final parts = text.split(',');
+    var dec = parts[1];
+    while (dec.length > 2 && dec.endsWith('0')) {
+      dec = dec.substring(0, dec.length - 1);
+    }
+    return 'R\$ ${parts[0]},$dec';
+  }
+
   static String percent(num? value, {int decimals = 1}) =>
       '${number(value, decimals: decimals)}%';
 

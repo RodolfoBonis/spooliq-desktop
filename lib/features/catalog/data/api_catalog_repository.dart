@@ -86,15 +86,22 @@ class ApiCatalogRepository implements CatalogRepository {
   Future<Supply> saveSupply({
     required String name,
     required SupplyUnit unit,
-    required int unitCostCents,
+    required double packageSize,
+    required int packagePriceCents,
     String? id,
     String? description,
     bool? isActive,
   }) async {
+    // unit_cost e derivado; enviado junto por compatibilidade com o legado.
+    final unitCost = packageSize <= 0
+        ? 0
+        : (packagePriceCents / packageSize).round();
     final body = compactJson({
       'name': name.trim(),
       'unit': unit.value,
-      'unit_cost': unitCostCents,
+      'package_size': packageSize,
+      'package_price': packagePriceCents,
+      'unit_cost': unitCost,
       'description': description?.trim() ?? '',
       'is_active': isActive,
     });

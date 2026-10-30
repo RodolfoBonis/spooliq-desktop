@@ -637,7 +637,8 @@ class _IconAction extends StatelessWidget {
 }
 
 /// Lista de insumos (por peca) com busca no catalogo e atalho de criacao.
-/// Subtotal = quantidade por peca x quantidade do item x custo unitario.
+/// Subtotal = quantidade por peca x quantidade do item x preco da embalagem /
+/// conteudo da embalagem (um unico arredondamento, via [supplyLineCostCents]).
 class _SupplyList extends StatelessWidget {
   const _SupplyList({
     required this.supplies,
@@ -654,7 +655,7 @@ class _SupplyList extends StatelessWidget {
   static Future<List<FormaSelectOption<Supply>>> _search(String q) async {
     final page = await di<CatalogRepository>().supplies(
       page: PageQuery(pageSize: 12, search: q.isEmpty ? null : q),
-      // Filtra no servidor: inativos não ocupam as vagas da busca.
+      // Filtra no servidor: inativos nao ocupam as vagas da busca.
       isActive: true,
     );
     return [
@@ -662,7 +663,7 @@ class _SupplyList extends StatelessWidget {
         FormaSelectOption(
           value: s,
           label: s.name,
-          subtitle: '${Fmt.cents(s.unitCostCents)} / ${s.unit.label}',
+          subtitle: '${supplyPackageLabel(s)} · ${supplyPerUnitLabel(s)}',
           leading: const Icon(Icons.category_outlined, size: 18),
         ),
     ];
@@ -677,7 +678,23 @@ class _SupplyList extends StatelessWidget {
     label: s.name,
     unit: s.unit.value,
     unitCostCents: s.unitCostCents,
+    packageSize: s.packageSize,
+    packagePriceCents: s.packagePriceCents,
   );
+
+  /// "10 ml x 10 pecas = 100 ml · R$ 17,48" para a linha escolhida.
+  String _subtotalLabel(SupplyUsageDraft s) {
+    final totalQty = s.quantityPerPiece * quantity;
+    final cost = supplyLineCostCents(
+      quantityPerPiece: s.quantityPerPiece,
+      productQuantity: quantity,
+      packagePriceCents: s.packagePriceCents,
+      packageSize: s.packageSize,
+    );
+    final pieces = quantity == 1 ? 'peça' : 'peças';
+    return '${Fmt.qty(s.quantityPerPiece)} ${s.unit} × $quantity $pieces = '
+        '${Fmt.qty(totalQty)} ${s.unit} · ${Fmt.cents(cost)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -691,76 +708,78 @@ class _SupplyList extends StatelessWidget {
           Padding(
             key: ValueKey('${s.supplyId}-$i'),
             padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: FormaCombobox<Supply>(
-                    hint: 'Buscar insumo...',
-                    value: s.supplyId.isEmpty
-                        ? null
-                        : FormaSelectOption(
-                            value: _placeholder(s),
-                            label: s.label,
-                            leading: const Icon(
-                              Icons.category_outlined,
-                              size: 18,
-                            ),
-                          ),
-                    search: _search,
-                    onChanged: (opt) {
-                      final picked = opt?.value;
-                      _set(
-                        i,
-                        picked == null
-                            ? SupplyUsageDraft(
-                                supplyId: '',
-                                quantityPerPiece: s.quantityPerPiece,
-                              )
-                            : _fromSupply(picked, s.quantityPerPiece),
-                      );
-                    },
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FormaCombobox<Supply>(
+                        hint: 'Buscar insumo...',
+                        value: s.supplyId.isEmpty
+                            ? null
+                            : FormaSelectOption(
+                                value: _placeholder(s),
+                                label: s.label,
+                                leading: const Icon(
+                                  Icons.category_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                        search: _search,
+                        onChanged: (opt) {
+                          final picked = opt?.value;
+                          _set(
+                            i,
+                            picked == null
+                                ? SupplyUsageDraft(
+                                    supplyId: '',
+                                    quantityPerPiece: s.quantityPerPiece,
+                                  )
+                                : _fromSupply(picked, s.quantityPerPiece),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 150,
+                      child: FormaNumberField(
+                        value: s.quantityPerPiece,
+                        decimals: 3,
+                        min: 0,
+                        errorText:
+                            error != null &&
+                                s.supplyId.isNotEmpty &&
+                                s.quantityPerPiece <= 0
+                            ? 'Obrigatório'
+                            : null,
+                        suffixText: s.unit.isEmpty ? '/peça' : '${s.unit}/peça',
+                        onChanged: (v) => _set(
+                          i,
+                          s.copyWith(quantityPerPiece: (v ?? 0).toDouble()),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _IconAction(
+                      icon: Icons.close_rounded,
+                      tooltip: 'Remover insumo',
+                      onPressed: () => onChanged([...supplies]..removeAt(i)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 140,
-                  child: FormaNumberField(
-                    value: s.quantityPerPiece,
-                    decimals: 2,
-                    min: 0,
-                    errorText:
-                        error != null &&
-                            s.supplyId.isNotEmpty &&
-                            s.quantityPerPiece <= 0
-                        ? 'Obrigatório'
-                        : null,
-                    suffixText: s.unit.isEmpty ? '/peça' : '${s.unit}/peça',
-                    onChanged: (v) => _set(
-                      i,
-                      s.copyWith(quantityPerPiece: (v ?? 0).toDouble()),
+                if (s.supplyId.isNotEmpty && s.quantityPerPiece > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 2),
+                    child: Text(
+                      _subtotalLabel(s),
+                      style: typo.caption12.copyWith(
+                        color: ext.textMuted,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 92,
-                  child: Text(
-                    Fmt.cents(
-                      (s.quantityPerPiece * quantity * s.unitCostCents).round(),
-                    ),
-                    textAlign: TextAlign.right,
-                    style: typo.body13.copyWith(
-                      color: ext.textPrimary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                _IconAction(
-                  icon: Icons.close_rounded,
-                  tooltip: 'Remover insumo',
-                  onPressed: () => onChanged([...supplies]..removeAt(i)),
-                ),
               ],
             ),
           ),
@@ -794,11 +813,13 @@ class _SupplyList extends StatelessWidget {
   }
 
   /// O combobox exige um [Supply] como valor; para o item ja escolhido usamos
-  /// um objeto minimo com o mesmo id.
+  /// um objeto minimo com o mesmo id e dados de embalagem.
   static Supply _placeholder(SupplyUsageDraft s) => Supply(
     id: s.supplyId,
     name: s.label,
     unit: SupplyUnit.fromValue(s.unit),
     unitCostCents: s.unitCostCents,
+    packageSize: s.packageSize,
+    packagePriceCents: s.packagePriceCents,
   );
 }
