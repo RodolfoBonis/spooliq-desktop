@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:spooliq_desktop/core/auth/session_user.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
 import 'package:spooliq_desktop/core/format/formatters.dart';
+import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/core/routing/routes.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
@@ -691,15 +693,19 @@ class _StatusBadge extends StatelessWidget {
       PaymentStatus.partial => (ext.warningSurface, ext.warningText),
       PaymentStatus.unpaid => (ext.appBackground, ext.textMuted),
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status.label,
-        style: typo.caption12Med.copyWith(color: fg),
+    return Semantics(
+      label: 'Status do pagamento: ${status.label}',
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          status.label,
+          style: typo.caption12Med.copyWith(color: fg),
+        ),
       ),
     );
   }
@@ -741,6 +747,26 @@ class _PaymentRow extends StatelessWidget {
   const _PaymentRow({required this.payment});
 
   final BudgetPayment payment;
+
+  Future<void> _openReceipt(BuildContext context, String url) async {
+    try {
+      final ok = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!ok && context.mounted) {
+        Toasts.error(
+          context,
+          const BusinessError('Não foi possível abrir o recibo.'),
+        );
+      }
+    } on Object catch (e, st) {
+      unawaited(
+        AppLogger.error(e, st, reason: 'open_receipt', category: 'payments'),
+      );
+      if (context.mounted) Toasts.error(context, e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -799,7 +825,7 @@ class _PaymentRow extends StatelessWidget {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              onPressed: () => unawaited(launchUrl(Uri.parse(p.receiptUrl!))),
+              onPressed: () => unawaited(_openReceipt(context, p.receiptUrl!)),
               icon: const Icon(Icons.receipt_long_outlined, size: 15),
               label: const Text('Recibo'),
             ),
@@ -833,21 +859,25 @@ class _Note extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typo = context.formaTypography;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: fg),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: typo.caption12.copyWith(color: fg)),
-          ),
-        ],
+    return Semantics(
+      label: text,
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: fg),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(text, style: typo.caption12.copyWith(color: fg)),
+            ),
+          ],
+        ),
       ),
     );
   }

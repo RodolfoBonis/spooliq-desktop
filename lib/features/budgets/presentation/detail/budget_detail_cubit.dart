@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/api_error.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
@@ -70,6 +71,9 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
   final PaymentRepository _payments;
   final String id;
 
+  /// A configuração da integração é buscada uma única vez por tela.
+  bool _settingsLoaded = false;
+
   Future<void> load() async {
     emit(state.copyWith(loading: true, error: () => null));
     try {
@@ -116,15 +120,26 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
       final payments = await _payments.budgetPayments(id);
       if (isClosed) return;
       emit(state.copyWith(payments: payments));
-    } on ApiError {
-      // Pagamentos são complementares: a tela segue sem o card.
+    } on ApiError catch (e) {
+      AppLogger.warning(
+        'Falha ao carregar pagamentos do orçamento',
+        category: 'payments',
+        error: e,
+      );
     }
+    // A configuração da integração muda raramente: busca uma vez por tela.
+    if (_settingsLoaded) return;
     try {
       final settings = await _payments.getSettings();
+      _settingsLoaded = true;
       if (isClosed) return;
       emit(state.copyWith(paymentsEnabled: settings.isActive));
-    } on ApiError {
-      // Sem integração: o botão de copiar link simplesmente não aparece.
+    } on ApiError catch (e) {
+      AppLogger.warning(
+        'Falha ao carregar a integração de pagamentos',
+        category: 'payments',
+        error: e,
+      );
     }
   }
 

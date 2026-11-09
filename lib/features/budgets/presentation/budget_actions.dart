@@ -21,6 +21,7 @@ import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_status_style.dart';
 import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_urls.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Decisão do usuário antes de mudar o status.
@@ -322,10 +323,23 @@ class BudgetActions {
   }
 
   /// Gera (ou reaproveita) o link de pagamento e copia para a área de
-  /// transferência.
+  /// transferência. Só copia URLs https da InfinitePay.
   Future<void> copyPaymentLink(Budget b) async {
     try {
       final link = await di<PaymentRepository>().createBudgetPaymentLink(b.id);
+      if (!isInfinitePayUrl(link.checkoutUrl)) {
+        AppLogger.warning(
+          'Link de pagamento com host inesperado foi descartado',
+          category: 'payments',
+        );
+        if (context.mounted) {
+          Toasts.error(
+            context,
+            const BusinessError('O link de pagamento recebido é inválido.'),
+          );
+        }
+        return;
+      }
       await Clipboard.setData(ClipboardData(text: link.checkoutUrl));
       if (!context.mounted) return;
       Toasts.success(
@@ -335,6 +349,8 @@ class BudgetActions {
       );
     } on ApiError catch (e) {
       if (context.mounted) Toasts.error(context, e);
+    } on Object catch (e, st) {
+      _unexpected(e, st, 'copy_payment_link');
     }
   }
 

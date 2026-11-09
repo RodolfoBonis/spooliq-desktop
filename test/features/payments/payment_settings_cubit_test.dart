@@ -35,6 +35,60 @@ void main() {
     pendingLinks: 2,
   );
 
+  group('friendlyPaymentError', () {
+    test('invalid credentials only for the specific code', () {
+      expect(
+        friendlyPaymentError(
+          const BusinessError(
+            'recusada',
+            code: 'infinitepay_invalid_credentials',
+            statusCode: 422,
+          ),
+        ),
+        contains('inválida'),
+      );
+    });
+
+    test('api_key_required maps to the "informe a chave" message', () {
+      expect(
+        friendlyPaymentError(
+          const BusinessError(
+            'faltou',
+            code: 'api_key_required',
+            statusCode: 422,
+          ),
+        ),
+        'Informe a chave de API.',
+      );
+    });
+
+    test('any other 422 shows the API message', () {
+      expect(
+        friendlyPaymentError(
+          const BusinessError(
+            'Handle inválido',
+            code: 'validation_error',
+            statusCode: 422,
+          ),
+        ),
+        'Handle inválido',
+      );
+    });
+
+    test('503 maps to the unavailable message', () {
+      expect(
+        friendlyPaymentError(const ServerError('x', 503)),
+        contains('indisponíveis'),
+      );
+      expect(
+        friendlyPaymentError(
+          const ServerError('x', 503, 'payments_not_configured'),
+        ),
+        contains('indisponíveis'),
+      );
+    });
+  });
+
   blocTest<PaymentSettingsCubit, PaymentSettingsState>(
     'loads the settings and seeds the form',
     setUp: () =>
@@ -48,9 +102,9 @@ void main() {
       expect(c.state.pendingLinks, 2);
       expect(c.state.handle, 'loja');
       expect(c.state.defaultDepositPercent, 50);
-      // Conectada: a chave começa mascarada, sem edição.
       expect(c.state.editingKey, isFalse);
       expect(c.state.dirty, isFalse);
+      expect(c.state.errors, isEmpty);
     },
   );
 
@@ -74,6 +128,45 @@ void main() {
     verify: (c) {
       expect(c.state.status, PaymentSettingsStatus.failure);
       expect(c.state.loadError, contains('indisponíveis'));
+    },
+  );
+
+  blocTest<PaymentSettingsCubit, PaymentSettingsState>(
+    'blocks save and shows field errors when invalid',
+    setUp: () => when(
+      () => repo.getSettings(),
+    ).thenAnswer((_) async => const PaymentSettings()),
+    build: () => PaymentSettingsCubit(repo),
+    act: (c) async {
+      await c.load();
+      // Nada preenchido: handle e chave obrigatórios.
+      expect(await c.save(), isFalse);
+    },
+    verify: (c) {
+      expect(c.state.errors, containsPair('handle', isA<String>()));
+      expect(c.state.errors, containsPair('api_key', isA<String>()));
+      verifyNever(() => repo.updateSettings(any()));
+    },
+  );
+
+  blocTest<PaymentSettingsCubit, PaymentSettingsState>(
+    'rejects a too-short api key and an out-of-range deposit',
+    setUp: () => when(
+      () => repo.getSettings(),
+    ).thenAnswer((_) async => const PaymentSettings()),
+    build: () => PaymentSettingsCubit(repo),
+    act: (c) async {
+      await c.load();
+      c
+        ..setHandle('loja')
+        ..setApiKey('short')
+        ..setDefaultDeposit(150);
+      expect(await c.save(), isFalse);
+    },
+    verify: (c) {
+      expect(c.state.errors, containsPair('api_key', isA<String>()));
+      expect(c.state.errors, containsPair('deposit', isA<String>()));
+      verifyNever(() => repo.updateSettings(any()));
     },
   );
 
@@ -137,6 +230,29 @@ void main() {
   );
 
   blocTest<PaymentSettingsCubit, PaymentSettingsState>(
+    'clearing the default deposit sends an explicit null',
+    setUp: () {
+      when(() => repo.getSettings()).thenAnswer((_) async => connected);
+      when(() => repo.updateSettings(any())).thenAnswer(
+        (_) async => connected.copyWith(defaultDepositPercent: () => null),
+      );
+    },
+    build: () => PaymentSettingsCubit(repo),
+    act: (c) async {
+      await c.load();
+      c.setDefaultDeposit(null);
+      expect(await c.save(), isTrue);
+    },
+    verify: (c) {
+      final captured =
+          verify(() => repo.updateSettings(captureAny())).captured.single
+              as PaymentSettingsUpdate;
+      expect(captured.defaultDepositPercent, isNull);
+      expect(c.state.defaultDepositPercent, isNull);
+    },
+  );
+
+  blocTest<PaymentSettingsCubit, PaymentSettingsState>(
     'maps 422 invalid credentials to a friendly message',
     setUp: () {
       when(
@@ -155,7 +271,7 @@ void main() {
       await c.load();
       c
         ..setHandle('loja')
-        ..setApiKey('bad');
+        ..setApiKey('invalidkey');
       expect(await c.save(), isFalse);
     },
     verify: (c) {
@@ -179,7 +295,7 @@ void main() {
       await c.load();
       c
         ..setHandle('loja')
-        ..setApiKey('k');
+        ..setApiKey('a_valid_key');
       expect(await c.save(), isFalse);
     },
     verify: (c) => expect(c.state.saveError, contains('indisponíveis')),

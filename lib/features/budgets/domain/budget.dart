@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 
 /// `{id, name}` de preset/perfil.
@@ -493,11 +494,24 @@ enum PaymentStatus {
   final String value;
   final String label;
 
-  static PaymentStatus fromValue(String? v) => switch (v) {
-    'partial' => partial,
-    'paid' => paid,
-    _ => unpaid,
-  };
+  static PaymentStatus fromValue(String? v) {
+    switch (v) {
+      case 'unpaid':
+        return unpaid;
+      case 'partial':
+        return partial;
+      case 'paid':
+        return paid;
+      default:
+        if (v != null && v.isNotEmpty) {
+          AppLogger.warning(
+            'Status de pagamento do orçamento desconhecido: $v',
+            category: 'budgets',
+          );
+        }
+        return unpaid;
+    }
+  }
 }
 
 /// Orçamento completo (`BudgetResponse`). Também é o retorno de `/preview`.
@@ -602,11 +616,7 @@ class Budget extends Equatable {
     depositPercent: json.dblOrNull('deposit_percent'),
     paymentStatus: PaymentStatus.fromValue(json.strOrNull('payment_status')),
     amountPaidCents: json.integer('amount_paid'),
-    balanceDueCents: json.integer(
-      'balance_due',
-      // Sem o campo, o saldo é o que falta do total.
-      json.integer('total_cost') - json.integer('amount_paid'),
-    ),
+    balanceDueCents: _balanceDueFrom(json),
     paidAt: json.date('paid_at'),
     items: json.list('items', BudgetItem.fromJson)
       ..sort((a, b) => a.order.compareTo(b.order)),
@@ -668,7 +678,7 @@ class Budget extends Equatable {
   /// Total já pago (centavos).
   final int amountPaidCents;
 
-  /// Saldo em aberto (centavos).
+  /// Saldo em aberto (centavos), nunca negativo.
   final int balanceDueCents;
 
   /// Quando o orçamento foi integralmente pago.
@@ -769,4 +779,13 @@ class Budget extends Equatable {
     amountPaidCents,
     balanceDueCents,
   ];
+}
+
+/// Saldo em aberto: usa `balance_due` do servidor ou, na ausência, o total
+/// menos o pago. Nunca negativo.
+int _balanceDueFrom(Json json) {
+  final raw =
+      json.intOrNull('balance_due') ??
+      (json.integer('total_cost') - json.integer('amount_paid'));
+  return raw < 0 ? 0 : raw;
 }

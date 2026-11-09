@@ -11,18 +11,23 @@ enum PaymentSettingsStatus { loading, ready, saving, failure }
 const _invalidCredentialsMessage =
     'A chave de API da InfinitePay é inválida. Confira no app da InfinitePay '
     '(Vendas → Checkout → Configurações) e cole a chave novamente.';
+const _apiKeyRequiredMessage = 'Informe a chave de API.';
 const _unavailableMessage =
     'Os pagamentos estão indisponíveis no momento. Tente novamente em '
     'instantes.';
 
+/// Traduz os erros conhecidos da InfinitePay; demais erros mostram a mensagem
+/// que a própria API enviou.
 String friendlyPaymentError(ApiError error) {
-  if (error.code == 'infinitepay_invalid_credentials' ||
-      error.statusCode == 422) {
-    return _invalidCredentialsMessage;
+  switch (error.code) {
+    case 'infinitepay_invalid_credentials':
+      return _invalidCredentialsMessage;
+    case 'api_key_required':
+      return _apiKeyRequiredMessage;
+    case 'payments_not_configured':
+      return _unavailableMessage;
   }
-  if (error.statusCode == 503 || error.code == 'payments_not_configured') {
-    return _unavailableMessage;
-  }
+  if (error.statusCode == 503) return _unavailableMessage;
   return error.message;
 }
 
@@ -37,6 +42,7 @@ class PaymentSettingsState extends Equatable {
     this.defaultDepositPercent,
     this.newApiKey,
     this.editingKey = false,
+    this.submitted = false,
     this.loadError,
     this.saveError,
   });
@@ -59,12 +65,48 @@ class PaymentSettingsState extends Equatable {
   /// O campo de chave está em modo de edição (sempre quando desconectada).
   final bool editingKey;
 
+  /// Houve uma tentativa de salvar — libera a exibição dos erros por campo.
+  final bool submitted;
+
   final String? loadError;
   final String? saveError;
 
   bool get connected => original?.connected ?? false;
   int get pendingLinks => original?.pendingLinks ?? 0;
   String get maskedApiKey => original?.maskedApiKey ?? '';
+  bool get saving => status == PaymentSettingsStatus.saving;
+
+  /// Erros de validação por campo, calculados sob demanda.
+  Map<String, String> validate() {
+    final errors = <String, String>{};
+    if (handle.trim().isEmpty) {
+      errors['handle'] = 'Informe o @handle da sua conta InfinitePay.';
+    }
+    final key = (newApiKey ?? '').trim();
+    if (!connected) {
+      if (key.isEmpty) {
+        errors['api_key'] = _apiKeyRequiredMessage;
+      } else if (key.length < 8) {
+        errors['api_key'] = 'A chave deve ter ao menos 8 caracteres.';
+      }
+    } else if (editingKey && key.isNotEmpty && key.length < 8) {
+      errors['api_key'] = 'A chave deve ter ao menos 8 caracteres.';
+    }
+    if (assuredInstallments < 1 || assuredInstallments > 12) {
+      errors['installments'] = 'Use de 1 a 12 parcelas.';
+    }
+    if (pixDiscountPercent < 0 || pixDiscountPercent > 30) {
+      errors['pix_discount'] = 'O desconto Pix deve estar entre 0 e 30%.';
+    }
+    final deposit = defaultDepositPercent;
+    if (deposit != null && (deposit <= 0 || deposit >= 100)) {
+      errors['deposit'] = 'O sinal deve ser maior que 0 e menor que 100%.';
+    }
+    return errors;
+  }
+
+  /// Erros exibidos na UI (só após a 1ª tentativa de salvar).
+  Map<String, String> get errors => submitted ? validate() : const {};
 
   bool get dirty {
     final o = original;
@@ -87,6 +129,7 @@ class PaymentSettingsState extends Equatable {
     double? Function()? defaultDepositPercent,
     String? Function()? newApiKey,
     bool? editingKey,
+    bool? submitted,
     String? Function()? loadError,
     String? Function()? saveError,
   }) => PaymentSettingsState(
@@ -101,6 +144,7 @@ class PaymentSettingsState extends Equatable {
         : defaultDepositPercent(),
     newApiKey: newApiKey == null ? this.newApiKey : newApiKey(),
     editingKey: editingKey ?? this.editingKey,
+    submitted: submitted ?? this.submitted,
     loadError: loadError == null ? this.loadError : loadError(),
     saveError: saveError == null ? this.saveError : saveError(),
   );
@@ -116,6 +160,7 @@ class PaymentSettingsState extends Equatable {
     defaultDepositPercent,
     newApiKey,
     editingKey,
+    submitted,
     loadError,
     saveError,
   ];
@@ -167,25 +212,16 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
   void setEnabled({required bool enabled}) =>
       emit(state.copyWith(enabled: enabled, saveError: () => null));
 
-  void setInstallments(int value) => emit(
-    state.copyWith(
-      assuredInstallments: value.clamp(1, 12),
-      saveError: () => null,
-    ),
-  );
+  // Os valores entram sem clamp: a validação é que sinaliza o que está fora da
+  // faixa, para não "esconder" um erro de digitação do usuário.
+  void setInstallments(int value) =>
+      emit(state.copyWith(assuredInstallments: value, saveError: () => null));
 
-  void setPixDiscount(double value) => emit(
-    state.copyWith(
-      pixDiscountPercent: value.clamp(0, 30),
-      saveError: () => null,
-    ),
-  );
+  void setPixDiscount(double value) =>
+      emit(state.copyWith(pixDiscountPercent: value, saveError: () => null));
 
   void setDefaultDeposit(double? value) => emit(
-    state.copyWith(
-      defaultDepositPercent: () => value,
-      saveError: () => null,
-    ),
+    state.copyWith(defaultDepositPercent: () => value, saveError: () => null),
   );
 
   /// Começa a trocar a chave de API (campo passa a aceitar uma nova).
@@ -201,17 +237,25 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
     emit(state.copyWith(editingKey: false, newApiKey: () => null));
   }
 
-  /// Salva as configurações. Retorna `true` no sucesso.
+  /// Salva as configurações. Retorna `true` no sucesso. Bloqueia o envio
+  /// enquanto houver erro de validação de campo.
   Future<bool> save() async {
+    if (state.validate().isNotEmpty) {
+      emit(state.copyWith(submitted: true, saveError: () => null));
+      return false;
+    }
     emit(
       state.copyWith(
         status: PaymentSettingsStatus.saving,
+        submitted: true,
         saveError: () => null,
       ),
     );
+    final key = (state.newApiKey ?? '').trim();
     final update = PaymentSettingsUpdate(
-      handle: state.handle.trim().isEmpty ? null : state.handle.trim(),
-      apiKey: state.editingKey ? state.newApiKey : null,
+      // Handle é obrigatório e já validado como não-vazio: nunca enviamos null.
+      handle: state.handle.trim(),
+      apiKey: state.editingKey && key.isNotEmpty ? key : null,
       enabled: state.enabled,
       assuredInstallments: state.assuredInstallments,
       pixDiscountPercent: state.pixDiscountPercent,

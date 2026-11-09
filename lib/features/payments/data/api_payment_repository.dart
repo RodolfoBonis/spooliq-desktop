@@ -1,4 +1,5 @@
 import 'package:spooliq_desktop/core/network/api_client.dart';
+import 'package:spooliq_desktop/core/network/json.dart';
 import 'package:spooliq_desktop/features/payments/domain/budget_payment.dart';
 import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
 import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
@@ -31,15 +32,11 @@ class ApiPaymentRepository implements PaymentRepository {
 
   @override
   Future<List<BudgetPayment>> budgetPayments(String budgetId) async {
-    final body = await _api.get('/budgets/$budgetId/payments');
-    final raw = body is Map
-        ? (body['data'] ?? body['payments'] ?? body['items'])
-        : body;
-    if (raw is! List) return const [];
-    return [
-      for (final e in raw)
-        if (e is Map) BudgetPayment.fromJson(Map<String, dynamic>.from(e)),
-    ];
+    // `BudgetPaymentsResponse`: {status,total,paid,balance,deposit_percent,
+    // payments:[...]}. A agregação (pago/saldo) vem do próprio orçamento; aqui
+    // só interessam as linhas.
+    final body = await _api.getJson('/budgets/$budgetId/payments');
+    return body.list('payments', BudgetPayment.fromJson);
   }
 
   @override

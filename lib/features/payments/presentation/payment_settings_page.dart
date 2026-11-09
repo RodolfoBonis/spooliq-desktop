@@ -34,27 +34,27 @@ class _PaymentSettingsView extends StatelessWidget {
     if (!context.mounted) return;
     if (ok) {
       Toasts.success(context, 'Configurações de pagamento salvas');
-    } else {
+    } else if (cubit.state.saveError != null) {
       _showError(context, cubit.state.saveError);
+    } else {
+      Toasts.info(context, 'Revise os campos destacados');
     }
   }
 
   Future<void> _disconnect(BuildContext context) async {
     final cubit = context.read<PaymentSettingsCubit>();
     final pending = cubit.state.pendingLinks;
-    final linkWord = pending == 1 ? 'link pendente' : 'links pendentes';
-    final validWord = pending == 1
-        ? 'continuará válido'
-        : 'continuarão válidos';
+    const base =
+        'Os links pendentes serão cancelados no SpoolIQ; se algum for pago '
+        'antes de expirar, o pagamento será registrado para você reembolsar '
+        'pela InfinitePay.';
+    final prefix = pending > 0
+        ? 'Há $pending ${pending == 1 ? 'link pendente' : 'links pendentes'}. '
+        : '';
     final ok = await FormaConfirmDialog.show(
       context,
       title: 'Desconectar a InfinitePay?',
-      message: pending > 0
-          ? 'Novos orçamentos deixam de oferecer pagamento pelo link. '
-                'Há $pending $linkWord que $validWord até expirar — '
-                'confirmações atrasadas ainda serão registradas.'
-          : 'Novos orçamentos deixam de oferecer pagamento pelo link. '
-                'Você pode reconectar a qualquer momento.',
+      message: '$prefix$base',
       confirmLabel: 'Desconectar',
       destructive: true,
     );
@@ -93,6 +93,8 @@ class _PaymentSettingsView extends StatelessWidget {
         }
         final ext = Theme.of(context).extension<FormaThemeExtension>()!;
         final typo = context.formaTypography;
+        final saving = state.saving;
+        final errors = state.errors;
 
         return Column(
           children: [
@@ -135,12 +137,14 @@ class _PaymentSettingsView extends StatelessWidget {
                                   key: const ValueKey('installments'),
                                   label: 'Parcelas sem juros',
                                   value: state.assuredInstallments,
-                                  min: 1,
-                                  max: 12,
                                   suffixText: 'x',
-                                  helperText: 'A empresa assume os juros',
+                                  enabled: !saving,
+                                  errorText: errors['installments'],
+                                  helperText: errors['installments'] == null
+                                      ? 'De 1 a 12 (a empresa assume os juros)'
+                                      : null,
                                   onChanged: (v) =>
-                                      cubit.setInstallments((v ?? 1).round()),
+                                      cubit.setInstallments((v ?? 0).round()),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -151,10 +155,12 @@ class _PaymentSettingsView extends StatelessWidget {
                                   label: 'Desconto no Pix',
                                   value: state.pixDiscountPercent,
                                   decimals: 2,
-                                  min: 0,
-                                  max: 30,
                                   suffixText: '%',
-                                  helperText: 'Opcional (0 a 30%)',
+                                  enabled: !saving,
+                                  errorText: errors['pix_discount'],
+                                  helperText: errors['pix_discount'] == null
+                                      ? 'Opcional (0 a 30%)'
+                                      : null,
                                   onChanged: (v) =>
                                       cubit.setPixDiscount(v?.toDouble() ?? 0),
                                 ),
@@ -167,10 +173,12 @@ class _PaymentSettingsView extends StatelessWidget {
                                   label: 'Sinal padrão',
                                   value: state.defaultDepositPercent,
                                   decimals: 2,
-                                  min: 0,
-                                  max: 100,
                                   suffixText: '%',
-                                  helperText: 'Vazio = pagamento integral',
+                                  enabled: !saving,
+                                  errorText: errors['deposit'],
+                                  helperText: errors['deposit'] == null
+                                      ? 'Vazio = pagamento integral'
+                                      : null,
                                   onChanged: (v) =>
                                       cubit.setDefaultDeposit(v?.toDouble()),
                                 ),
@@ -188,7 +196,9 @@ class _PaymentSettingsView extends StatelessWidget {
                           style: TextButton.styleFrom(
                             foregroundColor: ext.errorColor,
                           ),
-                          onPressed: () => unawaited(_disconnect(context)),
+                          onPressed: saving
+                              ? null
+                              : () => unawaited(_disconnect(context)),
                           icon: const Icon(Icons.link_off_rounded, size: 18),
                           label: const Text('Desconectar InfinitePay'),
                         ),
@@ -232,8 +242,10 @@ class _PaymentSettingsView extends StatelessWidget {
                       FormaButton.primary(
                         label: 'Salvar alterações',
                         small: true,
-                        isLoading: state.status == PaymentSettingsStatus.saving,
-                        onPressed: () => unawaited(_save(context)),
+                        isLoading: saving,
+                        onPressed: saving
+                            ? null
+                            : () => unawaited(_save(context)),
                       ),
                     ],
                   ),
@@ -275,6 +287,8 @@ class _ConnectionCardState extends State<_ConnectionCard> {
     final state = widget.state;
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
+    final saving = state.saving;
+    final errors = state.errors;
 
     return SectionCard(
       title: 'Conexão',
@@ -308,30 +322,35 @@ class _ConnectionCardState extends State<_ConnectionCard> {
             label: 'Handle (@)',
             hint: 'suaempresa',
             controller: _handle,
+            enabled: !saving,
             prefix: Text('@', style: typo.body14.copyWith(color: ext.textHint)),
             onChanged: cubit.setHandle,
           ),
+          _FieldError(message: errors['handle']),
           const SizedBox(height: 12),
           if (state.connected && !state.editingKey)
             _ConnectedKey(
               masked: state.maskedApiKey,
-              onChange: cubit.startEditingKey,
+              onChange: saving ? null : cubit.startEditingKey,
             )
-          else
+          else ...[
             FormaTextField(
               label: 'Chave de API',
               hint: 'Cole a chave gerada na InfinitePay',
               controller: _apiKey,
+              enabled: !saving,
               obscureText: true,
               onChanged: cubit.setApiKey,
             ),
+            _FieldError(message: errors['api_key']),
+          ],
           const SizedBox(height: 16),
           Row(
             children: [
               FormaSwitch(
                 value: state.enabled,
-                onChanged: (v) => cubit.setEnabled(enabled: v),
-                semanticLabel: 'Ativar pagamentos',
+                onChanged: saving ? null : (v) => cubit.setEnabled(enabled: v),
+                semanticLabel: 'Ativar pagamentos pelo link',
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -357,11 +376,32 @@ class _ConnectionCardState extends State<_ConnectionCard> {
   }
 }
 
+/// Linha de erro por campo (para os campos de texto, que não têm `errorText`).
+class _FieldError extends StatelessWidget {
+  const _FieldError({required this.message});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    if (message == null) return const SizedBox.shrink();
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 2),
+      child: Text(
+        message!,
+        style: typo.caption12.copyWith(color: ext.errorColor),
+      ),
+    );
+  }
+}
+
 class _ConnectedKey extends StatelessWidget {
   const _ConnectedKey({required this.masked, required this.onChange});
 
   final String masked;
-  final VoidCallback onChange;
+  final VoidCallback? onChange;
 
   @override
   Widget build(BuildContext context) {

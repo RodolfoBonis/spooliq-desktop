@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
+import 'package:spooliq_desktop/core/observability/app_logger.dart';
 
 /// O que está sendo cobrado neste pagamento.
 enum PaymentKind {
@@ -12,11 +13,24 @@ enum PaymentKind {
   final String value;
   final String label;
 
-  static PaymentKind fromValue(String? v) => switch (v) {
-    'deposit' => deposit,
-    'balance' => balance,
-    _ => full,
-  };
+  static PaymentKind fromValue(String? v) {
+    switch (v) {
+      case 'deposit':
+        return deposit;
+      case 'balance':
+        return balance;
+      case 'full':
+        return full;
+      default:
+        if (v != null && v.isNotEmpty) {
+          AppLogger.warning(
+            'Tipo de cobrança desconhecido: $v',
+            category: 'payments',
+          );
+        }
+        return full;
+    }
+  }
 }
 
 /// Situação de uma linha de pagamento.
@@ -31,16 +45,31 @@ enum BudgetPaymentStatus {
 
   final String value;
 
-  static BudgetPaymentStatus fromValue(String? v) => switch (v) {
-    'paid' => paid,
-    'refunded' => refunded,
-    'canceled' => canceled,
-    'failed' => failed,
-    _ => pending,
-  };
+  static BudgetPaymentStatus fromValue(String? v) {
+    switch (v) {
+      case 'pending':
+        return pending;
+      case 'paid':
+        return paid;
+      case 'refunded':
+        return refunded;
+      case 'canceled':
+        return canceled;
+      case 'failed':
+        return failed;
+      default:
+        if (v != null && v.isNotEmpty) {
+          AppLogger.warning(
+            'Status de pagamento desconhecido: $v',
+            category: 'payments',
+          );
+        }
+        return pending;
+    }
+  }
 }
 
-/// Um pagamento de orçamento (`GET /v1/budgets/:id/payments`).
+/// Um pagamento de orçamento (`PaymentLineResponse`).
 class BudgetPayment extends Equatable {
   const BudgetPayment({
     required this.kind,
@@ -57,13 +86,12 @@ class BudgetPayment extends Equatable {
   factory BudgetPayment.fromJson(Json json) => BudgetPayment(
     kind: PaymentKind.fromValue(json.strOrNull('kind')),
     status: BudgetPaymentStatus.fromValue(json.strOrNull('status')),
-    amountCents: json.integer('amount_cents', json.integer('amount')),
-    paidAmountCents: json.integer(
-      'paid_amount_cents',
-      json.integer('paid_amount'),
-    ),
+    amountCents: json.integer('amount'),
+    paidAmountCents: json.integer('paid_amount'),
     installments: json.intOrNull('installments'),
     captureMethod: json.strOrNull('capture_method'),
+    // `status_reason` ainda não vem no contrato autenticado; lido para
+    // encaminhar o aviso de "pago após cancelamento" quando o backend expor.
     statusReason: json.strOrNull('status_reason'),
     receiptUrl: json.strOrNull('receipt_url'),
     paidAt: json.date('paid_at'),
@@ -108,7 +136,7 @@ class BudgetPayment extends Equatable {
   ];
 }
 
-/// Link de pagamento gerado (`POST /v1/budgets/:id/payments/link`).
+/// Link de pagamento gerado (`CreateLinkResponse`).
 class PaymentLink extends Equatable {
   const PaymentLink({
     required this.checkoutUrl,
@@ -117,15 +145,12 @@ class PaymentLink extends Equatable {
     this.expiresAt,
   });
 
-  factory PaymentLink.fromJson(Json json) {
-    final j = json.unwrapData();
-    return PaymentLink(
-      checkoutUrl: j.str('checkout_url'),
-      kind: PaymentKind.fromValue(j.strOrNull('kind')),
-      amountCents: j.integer('amount_cents', j.integer('amount')),
-      expiresAt: j.date('expires_at'),
-    );
-  }
+  factory PaymentLink.fromJson(Json json) => PaymentLink(
+    checkoutUrl: json.str('checkout_url'),
+    kind: PaymentKind.fromValue(json.strOrNull('kind')),
+    amountCents: json.integer('amount'),
+    expiresAt: json.date('expires_at'),
+  );
 
   final String checkoutUrl;
   final PaymentKind kind;

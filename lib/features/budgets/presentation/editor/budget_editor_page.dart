@@ -20,6 +20,7 @@ import 'package:spooliq_desktop/features/budgets/presentation/editor/preview_pan
 import 'package:spooliq_desktop/features/budgets/presentation/editor/slicer_import.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 
 class SaveIntent extends Intent {
@@ -687,8 +688,9 @@ class _Form extends StatelessWidget {
   );
 }
 
-/// Campo "Sinal (%)" das Condições comerciais. Desabilitado (com link para
-/// as Configurações) enquanto a InfinitePay não está conectada.
+/// Campo "Sinal (%)" das Condições comerciais. Habilitado só quando a
+/// InfinitePay está conectada E ligada (mesma condição que herda o sinal
+/// padrão); caso contrário, fica desabilitado com um link para Configurações.
 class _DepositField extends StatelessWidget {
   const _DepositField({required this.state});
 
@@ -700,7 +702,8 @@ class _DepositField extends StatelessWidget {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     final d = state.draft;
-    final connected = state.lookups.payments?.connected ?? false;
+    final payments = state.lookups.payments;
+    final active = payments?.isActive ?? false;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -714,16 +717,16 @@ class _DepositField extends StatelessWidget {
             min: 0,
             max: 100,
             suffixText: '%',
-            enabled: connected,
+            enabled: active,
             errorText: state.errors['deposit'],
-            helperText: connected ? 'Vazio = pagamento integral' : null,
+            helperText: active ? 'Vazio = pagamento integral' : null,
             onChanged: (v) => cubit.update(
               (d) => d.copyWith(depositPercent: () => v?.toDouble()),
             ),
           ),
         ),
         const SizedBox(width: 12),
-        if (!connected)
+        if (!active)
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 22),
@@ -731,18 +734,19 @@ class _DepositField extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    'Conecte a InfinitePay para cobrar sinal no link. ',
+                    _hint(payments),
                     style: typo.caption12.copyWith(color: ext.textHint),
                   ),
-                  InkWell(
-                    onTap: () => context.go(Routes.payments),
-                    child: Text(
-                      'Abrir Configurações → Pagamentos',
-                      style: typo.caption12.copyWith(
-                        color: ext.primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: ext.primaryColor,
                     ),
+                    // push preserva o editor (e o rascunho) na pilha.
+                    onPressed: () => unawaited(context.push(Routes.payments)),
+                    child: const Text('Abrir Configurações → Pagamentos'),
                   ),
                 ],
               ),
@@ -750,5 +754,12 @@ class _DepositField extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  String _hint(PaymentSettings? payments) {
+    if (payments == null || !payments.connected) {
+      return 'Conecte a InfinitePay para cobrar sinal no link. ';
+    }
+    return 'Ative os pagamentos para cobrar sinal no link. ';
   }
 }
