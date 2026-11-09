@@ -5,8 +5,8 @@ import 'package:spooliq_desktop/core/network/json.dart';
 /// Payload real (anonimizado) de `GET /budgets/{id}`.
 ///
 /// Os campos de pagamento (`deposit_percent`, `payment_status`, `amount_paid`,
-/// `balance_due`) só entram quando informados, para que os testes possam
-/// cobrir tanto a ausência (defaults) quanto a presença.
+/// `balance_due`, `amount_refund_due_cents`) só entram quando informados, para
+/// que os testes possam cobrir tanto a ausência (defaults) quanto a presença.
 Json budgetJson({
   String id = 'b-1',
   String status = 'draft',
@@ -15,6 +15,7 @@ Json budgetJson({
   String? paymentStatus,
   int? amountPaid,
   int? balanceDue,
+  int? amountRefundDue,
 }) => {
   'id': id,
   'organization_id': 'org-1',
@@ -56,6 +57,7 @@ Json budgetJson({
   'payment_status': ?paymentStatus,
   'amount_paid': ?amountPaid,
   'balance_due': ?balanceDue,
+  'amount_refund_due_cents': ?amountRefundDue,
   'created_at': '2026-10-01T10:00:00Z',
   'updated_at': '2026-10-02T10:00:00Z',
   'customer': {'id': 'c-1', 'name': 'Ana Souza', 'email': 'ana@x.com'},

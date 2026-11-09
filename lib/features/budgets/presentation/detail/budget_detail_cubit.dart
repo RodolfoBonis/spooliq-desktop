@@ -15,6 +15,7 @@ class BudgetDetailState extends Equatable {
     this.budget,
     this.history = const [],
     this.payments = const [],
+    this.refundDueCents = 0,
     this.paymentsEnabled = false,
     this.loading = true,
     this.error,
@@ -27,6 +28,10 @@ class BudgetDetailState extends Equatable {
   /// Pagamentos do orçamento (vazio quando não há integração/cobranças).
   final List<BudgetPayment> payments;
 
+  /// Valor a reembolsar (pagamentos em links cancelados). Vem do orçamento e
+  /// é confirmado pela lista de pagamentos.
+  final int refundDueCents;
+
   /// A integração está conectada e ligada (habilita gerar link).
   final bool paymentsEnabled;
   final bool loading;
@@ -37,6 +42,7 @@ class BudgetDetailState extends Equatable {
     Budget? budget,
     List<StatusChange>? history,
     List<BudgetPayment>? payments,
+    int? refundDueCents,
     bool? paymentsEnabled,
     bool? loading,
     String? Function()? error,
@@ -45,6 +51,7 @@ class BudgetDetailState extends Equatable {
     budget: budget ?? this.budget,
     history: history ?? this.history,
     payments: payments ?? this.payments,
+    refundDueCents: refundDueCents ?? this.refundDueCents,
     paymentsEnabled: paymentsEnabled ?? this.paymentsEnabled,
     loading: loading ?? this.loading,
     error: error == null ? this.error : error(),
@@ -56,6 +63,7 @@ class BudgetDetailState extends Equatable {
     budget,
     history,
     payments,
+    refundDueCents,
     paymentsEnabled,
     loading,
     error,
@@ -83,6 +91,8 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
         state.copyWith(
           budget: budget,
           history: budget.statusHistory,
+          // O orçamento já traz o agregado a reembolsar.
+          refundDueCents: budget.amountRefundDueCents,
           loading: false,
         ),
       );
@@ -98,6 +108,7 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
   /// chamadas em rascunhos/enviados que nunca tiveram pagamento.
   static bool _hasPaymentContext(Budget b) =>
       b.paymentStatus != PaymentStatus.unpaid ||
+      b.amountRefundDueCents > 0 ||
       const {
         BudgetStatus.approved,
         BudgetStatus.printing,
@@ -117,9 +128,14 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
 
   Future<void> _loadPayments() async {
     try {
-      final payments = await _payments.budgetPayments(id);
+      final result = await _payments.budgetPayments(id);
       if (isClosed) return;
-      emit(state.copyWith(payments: payments));
+      emit(
+        state.copyWith(
+          payments: result.payments,
+          refundDueCents: result.refundDueCents,
+        ),
+      );
     } on ApiError catch (e) {
       AppLogger.warning(
         'Falha ao carregar pagamentos do orçamento',
@@ -145,7 +161,12 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
 
   /// Atualização vinda de uma ação (status, share…).
   void replace(Budget budget) {
-    emit(state.copyWith(budget: budget));
+    emit(
+      state.copyWith(
+        budget: budget,
+        refundDueCents: budget.amountRefundDueCents,
+      ),
+    );
     unawaited(_loadHistory());
     if (_hasPaymentContext(budget)) unawaited(_loadPayments());
   }

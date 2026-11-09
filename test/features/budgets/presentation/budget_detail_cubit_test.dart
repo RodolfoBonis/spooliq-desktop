@@ -93,7 +93,8 @@ void main() {
   );
 
   blocTest<BudgetDetailCubit, BudgetDetailState>(
-    'loads payments and integration status for a budget with a balance',
+    'loads payments, refund-due and integration status for a budget with a '
+    'balance',
     setUp: () {
       final paid = Budget.fromJson(
         budgetJson(
@@ -101,22 +102,24 @@ void main() {
           paymentStatus: 'partial',
           amountPaid: 1000,
           balanceDue: 24990,
+          amountRefundDue: 500,
         ),
       );
       final payment = BudgetPayment.fromJson(const {
         'kind': 'deposit',
         'status': 'paid',
-        'amount_cents': 1000,
-        'paid_amount_cents': 1000,
+        'amount': 1000,
+        'paid_amount': 1000,
         'capture_method': 'pix',
         'paid_at': '2026-10-05T10:00:00Z',
         'receipt_url': 'https://infinitepay.io/receipts/abc',
       });
       when(() => repo.get('b-1')).thenAnswer((_) async => paid);
       when(() => repo.history('b-1')).thenThrow(const ServerError('x'));
-      when(
-        () => payments.budgetPayments('b-1'),
-      ).thenAnswer((_) async => [payment]);
+      when(() => payments.budgetPayments('b-1')).thenAnswer(
+        (_) async =>
+            BudgetPaymentsResult(refundDueCents: 500, payments: [payment]),
+      );
       when(() => payments.getSettings()).thenAnswer(
         (_) async => const PaymentSettings(enabled: true, connected: true),
       );
@@ -129,6 +132,7 @@ void main() {
     verify: (c) {
       expect(c.state.payments, hasLength(1));
       expect(c.state.payments.single.kind, PaymentKind.deposit);
+      expect(c.state.refundDueCents, 500);
       expect(c.state.paymentsEnabled, isTrue);
       verify(() => payments.budgetPayments('b-1')).called(1);
     },

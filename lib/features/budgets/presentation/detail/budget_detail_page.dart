@@ -60,6 +60,7 @@ class BudgetDetailPage extends StatelessWidget {
             budget: budget,
             history: state.history,
             payments: state.payments,
+            refundDueCents: state.refundDueCents,
             paymentsEnabled: state.paymentsEnabled,
           );
         },
@@ -73,12 +74,14 @@ class _DetailView extends StatelessWidget {
     required this.budget,
     required this.history,
     required this.payments,
+    required this.refundDueCents,
     required this.paymentsEnabled,
   });
 
   final Budget budget;
   final List<StatusChange> history;
   final List<BudgetPayment> payments;
+  final int refundDueCents;
   final bool paymentsEnabled;
 
   @override
@@ -182,6 +185,7 @@ class _DetailView extends StatelessWidget {
             budget: budget,
             history: history,
             payments: payments,
+            refundDueCents: refundDueCents,
           );
           if (!wide) {
             return Column(
@@ -512,14 +516,18 @@ class _SideColumn extends StatelessWidget {
     required this.budget,
     required this.history,
     required this.payments,
+    required this.refundDueCents,
   });
 
   final Budget budget;
   final List<StatusChange> history;
   final List<BudgetPayment> payments;
+  final int refundDueCents;
 
   bool get _showPayment =>
-      budget.paymentStatus != PaymentStatus.unpaid || payments.isNotEmpty;
+      budget.paymentStatus != PaymentStatus.unpaid ||
+      payments.isNotEmpty ||
+      refundDueCents > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +544,11 @@ class _SideColumn extends StatelessWidget {
         ),
         if (_showPayment) ...[
           const SizedBox(height: 16),
-          _PaymentCard(budget: budget, payments: payments),
+          _PaymentCard(
+            budget: budget,
+            payments: payments,
+            refundDueCents: refundDueCents,
+          ),
         ],
         const SizedBox(height: 16),
         SectionCard(
@@ -601,17 +613,21 @@ class _SideColumn extends StatelessWidget {
 /// Card "Pagamento": badge do status, totais pago/saldo e as linhas de
 /// pagamento (tipo, valor, método, parcelas, data, recibo).
 class _PaymentCard extends StatelessWidget {
-  const _PaymentCard({required this.budget, required this.payments});
+  const _PaymentCard({
+    required this.budget,
+    required this.payments,
+    required this.refundDueCents,
+  });
 
   final Budget budget;
   final List<BudgetPayment> payments;
+  final int refundDueCents;
 
   @override
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     final overpaid = budget.amountPaidCents > budget.totalCents;
-    final hasPaidAfterCancel = payments.any((p) => p.isPaidAfterCancel);
 
     return SectionCard(
       title: 'Pagamento',
@@ -648,15 +664,15 @@ class _PaymentCard extends StatelessWidget {
                   'do parcelamento.',
             ),
           ],
-          if (hasPaidAfterCancel) ...[
+          if (refundDueCents > 0) ...[
             const SizedBox(height: 10),
             _Note(
               icon: Icons.warning_amber_rounded,
-              bg: ext.errorSurface,
-              fg: ext.errorText,
+              bg: ext.warningSurface,
+              fg: ext.warningText,
               text:
-                  'Pagamento recebido após o cancelamento — reembolse pela '
-                  'InfinitePay.',
+                  'A reembolsar: ${Fmt.cents(refundDueCents)} — pagamento '
+                  'recebido após o cancelamento; reembolse pela InfinitePay.',
             ),
           ],
           if (payments.isNotEmpty) ...[
@@ -816,6 +832,14 @@ class _PaymentRow extends StatelessWidget {
               ),
           ],
         ),
+        if (p.isPaidAfterCancel)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'Pago após cancelamento',
+              style: typo.caption12.copyWith(color: ext.warningText),
+            ),
+          ),
         if (canOpenReceipt)
           Align(
             alignment: Alignment.centerLeft,

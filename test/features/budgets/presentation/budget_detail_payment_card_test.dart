@@ -25,7 +25,7 @@ class _Session extends Mock implements SessionCubit {}
 void main() {
   setUpAll(() => registerFallbackValue(const PageQuery()));
 
-  testWidgets('payment card shows overpaid and paid-after-cancel notes', (
+  testWidgets('payment card shows overpaid and refund-due notes', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1500, 1800);
@@ -40,8 +40,10 @@ void main() {
           status: 'cancelled',
           total: 2000,
           paymentStatus: 'partial',
-          amountPaid: 3000,
+          // Overpaid por juros do comprador; refund-due é separado.
+          amountPaid: 2100,
           balanceDue: 0,
+          amountRefundDue: 3000,
         ),
       ),
     );
@@ -49,18 +51,21 @@ void main() {
       () => budgets.history('b-1'),
     ).thenAnswer((_) async => const Paginated.empty());
     when(() => payments.budgetPayments('b-1')).thenAnswer(
-      (_) async => [
-        BudgetPayment.fromJson(const {
-          'kind': 'full',
-          'amount': 2000,
-          'paid_amount': 3000,
-          'capture_method': 'credit_card',
-          'installments': 3,
-          'status': 'paid',
-          'status_reason': 'paid_after_cancel',
-          'receipt_url': 'https://infinitepay.io/r/1',
-        }),
-      ],
+      (_) async => BudgetPaymentsResult(
+        refundDueCents: 3000,
+        payments: [
+          BudgetPayment.fromJson(const {
+            'kind': 'full',
+            'amount': 3000,
+            'paid_amount': 3000,
+            'capture_method': 'credit_card',
+            'installments': 3,
+            'status': 'paid',
+            'status_reason': 'paid_after_cancel',
+            'receipt_url': 'https://infinitepay.io/r/1',
+          }),
+        ],
+      ),
     );
     when(
       payments.getSettings,
@@ -99,7 +104,9 @@ void main() {
 
     expect(find.text('Pagamento'), findsOneWidget);
     expect(find.textContaining('Valor pago maior que o total'), findsOneWidget);
+    expect(find.textContaining('A reembolsar:'), findsOneWidget);
     expect(find.textContaining('reembolse pela'), findsOneWidget);
+    expect(find.text('Pago após cancelamento'), findsOneWidget);
     expect(find.text('Recibo'), findsOneWidget);
   });
 }

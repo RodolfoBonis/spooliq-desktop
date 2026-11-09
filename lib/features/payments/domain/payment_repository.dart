@@ -15,7 +15,7 @@ abstract interface class PaymentRepository {
   Future<PaymentSettings> disconnect();
 
   /// `GET /v1/budgets/:id/payments`.
-  Future<List<BudgetPayment>> budgetPayments(String budgetId);
+  Future<BudgetPaymentsResult> budgetPayments(String budgetId);
 
   /// `POST /v1/budgets/:id/payments/link` — gera ou reaproveita o link.
   Future<PaymentLink> createBudgetPaymentLink(String budgetId);

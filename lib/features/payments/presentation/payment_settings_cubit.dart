@@ -56,7 +56,7 @@ class PaymentSettingsState extends Equatable {
   final String handle;
   final bool enabled;
   final int assuredInstallments;
-  final double pixDiscountPercent;
+  final int pixDiscountPercent;
   final double? defaultDepositPercent;
 
   /// Nova chave digitada; `null` = manter a atual.
@@ -125,7 +125,7 @@ class PaymentSettingsState extends Equatable {
     String? handle,
     bool? enabled,
     int? assuredInstallments,
-    double? pixDiscountPercent,
+    int? pixDiscountPercent,
     double? Function()? defaultDepositPercent,
     String? Function()? newApiKey,
     bool? editingKey,
@@ -217,7 +217,7 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
   void setInstallments(int value) =>
       emit(state.copyWith(assuredInstallments: value, saveError: () => null));
 
-  void setPixDiscount(double value) =>
+  void setPixDiscount(int value) =>
       emit(state.copyWith(pixDiscountPercent: value, saveError: () => null));
 
   void setDefaultDeposit(double? value) => emit(

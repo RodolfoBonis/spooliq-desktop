@@ -566,6 +566,7 @@ class Budget extends Equatable {
     this.paymentStatus = PaymentStatus.unpaid,
     this.amountPaidCents = 0,
     this.balanceDueCents = 0,
+    this.amountRefundDueCents = 0,
     this.paidAt,
     this.createdAt,
     this.updatedAt,
@@ -617,6 +618,7 @@ class Budget extends Equatable {
     paymentStatus: PaymentStatus.fromValue(json.strOrNull('payment_status')),
     amountPaidCents: json.integer('amount_paid'),
     balanceDueCents: _balanceDueFrom(json),
+    amountRefundDueCents: json.integer('amount_refund_due_cents'),
     paidAt: json.date('paid_at'),
     items: json.list('items', BudgetItem.fromJson)
       ..sort((a, b) => a.order.compareTo(b.order)),
@@ -675,11 +677,14 @@ class Budget extends Equatable {
   /// Situação de pagamento agregada.
   final PaymentStatus paymentStatus;
 
-  /// Total já pago (centavos).
+  /// Total já pago (centavos). NÃO inclui pagamentos `paid_after_cancel`.
   final int amountPaidCents;
 
   /// Saldo em aberto (centavos), nunca negativo.
   final int balanceDueCents;
+
+  /// Valor recebido em links já cancelados, a reembolsar pela InfinitePay.
+  final int amountRefundDueCents;
 
   /// Quando o orçamento foi integralmente pago.
   final DateTime? paidAt;
@@ -756,6 +761,7 @@ class Budget extends Equatable {
       paymentStatus: b.paymentStatus,
       amountPaidCents: b.amountPaidCents,
       balanceDueCents: b.balanceDueCents,
+      amountRefundDueCents: b.amountRefundDueCents,
       paidAt: b.paidAt,
       items: b.items,
       stockWarnings: b.stockWarnings,
@@ -778,6 +784,7 @@ class Budget extends Equatable {
     paymentStatus,
     amountPaidCents,
     balanceDueCents,
+    amountRefundDueCents,
   ];
 }
 

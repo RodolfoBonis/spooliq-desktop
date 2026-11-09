@@ -154,15 +154,14 @@ class _PaymentSettingsView extends StatelessWidget {
                                   key: const ValueKey('pix-discount'),
                                   label: 'Desconto no Pix',
                                   value: state.pixDiscountPercent,
-                                  decimals: 2,
                                   suffixText: '%',
                                   enabled: !saving,
                                   errorText: errors['pix_discount'],
                                   helperText: errors['pix_discount'] == null
-                                      ? 'Opcional (0 a 30%)'
+                                      ? 'Inteiro, de 0 a 30%'
                                       : null,
                                   onChanged: (v) =>
-                                      cubit.setPixDiscount(v?.toDouble() ?? 0),
+                                      cubit.setPixDiscount((v ?? 0).round()),
                                 ),
                               ),
                               const SizedBox(width: 12),

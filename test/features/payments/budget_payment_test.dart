@@ -49,6 +49,17 @@ void main() {
       expect(p.isPaidAfterCancel, isTrue);
     });
 
+    test('treats an absent status_reason as not-after-cancel', () {
+      final p = BudgetPayment.fromJson(const {
+        'kind': 'full',
+        'amount': 200,
+        'paid_amount': 200,
+        'status': 'paid',
+      });
+      expect(p.statusReason, isNull);
+      expect(p.isPaidAfterCancel, isFalse);
+    });
+
     test('falls back to safe defaults for unknown enum values', () {
       final p = BudgetPayment.fromJson(const {
         'kind': 'weird',
@@ -58,6 +69,35 @@ void main() {
       expect(p.kind, PaymentKind.full);
       expect(p.status, BudgetPaymentStatus.pending);
       expect(p.methodLabel, '—');
+    });
+  });
+
+  group('BudgetPaymentsResult.fromJson', () {
+    test('reads refund_due and the payment lines', () {
+      final r = BudgetPaymentsResult.fromJson(const {
+        'status': 'partial',
+        'total': 2000,
+        'paid': 1000,
+        'balance': 1000,
+        'refund_due': 500,
+        'payments': [
+          {
+            'kind': 'deposit',
+            'amount': 1000,
+            'paid_amount': 1000,
+            'status': 'paid',
+          },
+        ],
+      });
+      expect(r.refundDueCents, 500);
+      expect(r.payments, hasLength(1));
+      expect(r.payments.single.kind, PaymentKind.deposit);
+    });
+
+    test('defaults refund_due to 0 and payments to empty when absent', () {
+      final r = BudgetPaymentsResult.fromJson(const {'status': 'unpaid'});
+      expect(r.refundDueCents, 0);
+      expect(r.payments, isEmpty);
     });
   });
 

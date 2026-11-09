@@ -108,6 +108,7 @@ void main() {
       expect(b.depositPercent, isNull);
       expect(b.paymentStatus, PaymentStatus.unpaid);
       expect(b.amountPaidCents, 0);
+      expect(b.amountRefundDueCents, 0);
       // Sem balance_due, o saldo é o total inteiro.
       expect(b.balanceDueCents, 25990);
     });
@@ -120,12 +121,21 @@ void main() {
           paymentStatus: 'partial',
           amountPaid: 1000,
           balanceDue: 24990,
+          amountRefundDue: 500,
         ),
       );
       expect(paid.depositPercent, 50);
       expect(paid.paymentStatus, PaymentStatus.partial);
       expect(paid.amountPaidCents, 1000);
       expect(paid.balanceDueCents, 24990);
+      expect(paid.amountRefundDueCents, 500);
+    });
+
+    test('clamps a negative balance to zero', () {
+      final over = Budget.fromJson(
+        budgetJson(total: 2000, amountPaid: 2100, balanceDue: -100),
+      );
+      expect(over.balanceDueCents, 0);
     });
 
     for (final missing in [
@@ -155,12 +165,18 @@ void main() {
 
     test('copyWithStatus keeps the payment aggregate', () {
       final paid = Budget.fromJson(
-        budgetJson(paymentStatus: 'paid', amountPaid: 25990, balanceDue: 0),
+        budgetJson(
+          paymentStatus: 'paid',
+          amountPaid: 25990,
+          balanceDue: 0,
+          amountRefundDue: 300,
+        ),
       );
       final moved = paid.copyWithStatus(BudgetStatus.completed);
       expect(moved.paymentStatus, PaymentStatus.paid);
       expect(moved.amountPaidCents, 25990);
       expect(moved.balanceDueCents, 0);
+      expect(moved.amountRefundDueCents, 300);
     });
   });
 }

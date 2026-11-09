@@ -90,8 +90,7 @@ class BudgetPayment extends Equatable {
     paidAmountCents: json.integer('paid_amount'),
     installments: json.intOrNull('installments'),
     captureMethod: json.strOrNull('capture_method'),
-    // `status_reason` ainda não vem no contrato autenticado; lido para
-    // encaminhar o aviso de "pago após cancelamento" quando o backend expor.
+    // Exposto só no contrato autenticado; ausente = null.
     statusReason: json.strOrNull('status_reason'),
     receiptUrl: json.strOrNull('receipt_url'),
     paidAt: json.date('paid_at'),
@@ -134,6 +133,30 @@ class BudgetPayment extends Equatable {
     receiptUrl,
     paidAt,
   ];
+}
+
+/// Resposta de `GET /v1/budgets/:id/payments` (`BudgetPaymentsResponse`).
+///
+/// Só guardamos o que a tela usa: o valor a reembolsar (soma dos pagamentos
+/// `paid_after_cancel`, que NÃO entra no total pago) e as linhas. A agregação
+/// pago/saldo vem do próprio orçamento.
+class BudgetPaymentsResult extends Equatable {
+  const BudgetPaymentsResult({
+    this.refundDueCents = 0,
+    this.payments = const [],
+  });
+
+  factory BudgetPaymentsResult.fromJson(Json json) => BudgetPaymentsResult(
+    refundDueCents: json.integer('refund_due'),
+    payments: json.list('payments', BudgetPayment.fromJson),
+  );
+
+  /// Valor recebido em links cancelados, a reembolsar pela InfinitePay.
+  final int refundDueCents;
+  final List<BudgetPayment> payments;
+
+  @override
+  List<Object?> get props => [refundDueCents, payments];
 }
 
 /// Link de pagamento gerado (`CreateLinkResponse`).

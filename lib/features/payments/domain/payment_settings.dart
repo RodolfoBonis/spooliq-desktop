@@ -35,7 +35,7 @@ class PaymentSettings extends Equatable {
         1,
         12,
       ),
-      pixDiscountPercent: j.dbl('pix_discount_percent'),
+      pixDiscountPercent: j.integer('pix_discount_percent'),
       defaultDepositPercent: j.dblOrNull('default_deposit_percent'),
       pendingLinks: j.integer('pending_links'),
     );
@@ -53,8 +53,8 @@ class PaymentSettings extends Equatable {
   /// Parcelas sem juros (1–12).
   final int assuredInstallments;
 
-  /// Desconto Pix (0–30%).
-  final double pixDiscountPercent;
+  /// Desconto Pix inteiro (0–30%).
+  final int pixDiscountPercent;
 
   /// Sinal padrão aplicado a novos orçamentos; `null` = pagamento integral.
   final double? defaultDepositPercent;
@@ -74,7 +74,7 @@ class PaymentSettings extends Equatable {
     bool? connected,
     String? Function()? apiKeyLast4,
     int? assuredInstallments,
-    double? pixDiscountPercent,
+    int? pixDiscountPercent,
     double? Function()? defaultDepositPercent,
     int? pendingLinks,
   }) => PaymentSettings(
@@ -121,7 +121,7 @@ class PaymentSettingsUpdate extends Equatable {
   final String? handle;
   final bool enabled;
   final int assuredInstallments;
-  final double pixDiscountPercent;
+  final int pixDiscountPercent;
 
   /// Nova chave a enviar. `null` = manter a atual.
   final String? apiKey;
