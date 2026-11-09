@@ -27,6 +27,7 @@ import 'package:spooliq_desktop/features/customers/presentation/customer_detail_
 import 'package:spooliq_desktop/features/customers/presentation/customers_page.dart';
 import 'package:spooliq_desktop/features/dashboard/presentation/dashboard_page.dart';
 import 'package:spooliq_desktop/features/models3d/presentation/models_page.dart';
+import 'package:spooliq_desktop/features/payments/presentation/payment_settings_page.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/presentation/presets_page.dart';
 import 'package:spooliq_desktop/features/presets/presentation/profiles_page.dart';
@@ -145,6 +146,7 @@ GoRouter buildRouter(SessionCubit session) {
           page(Routes.costs, (_) => const PresetsPage(type: PresetType.cost)),
           page(Routes.company, (_) => const CompanySettingsPage()),
           page(Routes.branding, (_) => const BrandingPage()),
+          page(Routes.payments, (_) => const PaymentSettingsPage()),
           page(Routes.users, (_) => const UsersPage()),
           page(Routes.account, (_) => const AccountPage()),
           page(Routes.subscription, (_) => const SubscriptionPage()),

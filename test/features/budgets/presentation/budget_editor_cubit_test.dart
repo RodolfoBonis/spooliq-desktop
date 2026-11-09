@@ -11,6 +11,8 @@ import 'package:spooliq_desktop/features/company/domain/company.dart';
 import 'package:spooliq_desktop/features/company/domain/company_repository.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 
@@ -24,10 +26,13 @@ class _Company extends Mock implements CompanyRepository {}
 
 class _Customers extends Mock implements CustomerRepository {}
 
+class _Payments extends Mock implements PaymentRepository {}
+
 void main() {
   late _Budgets budgets;
   late _Presets presets;
   late _Company company;
+  late _Payments payments;
 
   setUpAll(() {
     registerFallbackValue(const BudgetDraft());
@@ -38,6 +43,7 @@ void main() {
     budgets = _Budgets();
     presets = _Presets();
     company = _Company();
+    payments = _Payments();
     when(() => presets.profiles()).thenAnswer(
       (_) async => const Paginated(
         items: [
@@ -58,6 +64,10 @@ void main() {
         defaultPaymentTerms: '50% na aprovação',
       ),
     );
+    // Por padrão, a integração está desconectada.
+    when(
+      () => payments.getSettings(),
+    ).thenAnswer((_) async => const PaymentSettings());
   });
 
   BudgetEditorCubit build({String? id}) => BudgetEditorCubit(
@@ -65,6 +75,7 @@ void main() {
     presets: presets,
     company: company,
     customers: _Customers(),
+    payments: payments,
     budgetId: id,
     previewDebounce: const Duration(milliseconds: 10),
   );
@@ -83,7 +94,46 @@ void main() {
       expect(c.state.status, EditorStatus.ready);
       expect(c.state.draft.profileId, 'p-default');
       expect(c.state.draft.paymentTerms, '50% na aprovação');
+      // Integração desconectada: sem sinal padrão herdado.
+      expect(c.state.draft.depositPercent, isNull);
       verifyNever(() => budgets.preview(any()));
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'new budget inherits the default deposit when the integration is active',
+    build: build,
+    setUp: () => when(() => payments.getSettings()).thenAnswer(
+      (_) async => const PaymentSettings(
+        connected: true,
+        enabled: true,
+        defaultDepositPercent: 50,
+      ),
+    ),
+    act: (c) => c.load(),
+    verify: (c) {
+      expect(c.state.draft.depositPercent, 50);
+      expect(c.state.lookups.payments?.isActive, isTrue);
+    },
+  );
+
+  blocTest<BudgetEditorCubit, BudgetEditorState>(
+    'the deposit field can be cleared back to full payment',
+    build: build,
+    setUp: () => when(() => payments.getSettings()).thenAnswer(
+      (_) async => const PaymentSettings(
+        connected: true,
+        enabled: true,
+        defaultDepositPercent: 40,
+      ),
+    ),
+    act: (c) async {
+      await c.load();
+      c.update((d) => d.copyWith(depositPercent: () => null));
+    },
+    verify: (c) {
+      expect(c.state.draft.depositPercent, isNull);
+      expect(c.state.dirty, isTrue);
     },
   );
 

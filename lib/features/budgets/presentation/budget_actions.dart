@@ -20,6 +20,8 @@ import 'package:spooliq_desktop/features/budgets/domain/budget.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_repository.dart';
 import 'package:spooliq_desktop/features/budgets/domain/budget_status.dart';
 import 'package:spooliq_desktop/features/budgets/presentation/widgets/budget_status_style.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_urls.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Decisão do usuário antes de mudar o status.
@@ -172,6 +174,7 @@ class BudgetActions {
     required this.onChanged,
     required this.onDeleted,
     this.onMove,
+    this.paymentsEnabled = false,
   });
 
   final BuildContext context;
@@ -185,7 +188,21 @@ class BudgetActions {
   final Future<bool> Function(Budget budget, BudgetStatus to, String? notes)?
   onMove;
 
+  /// A integração de pagamentos está ativa (habilita copiar link).
+  final bool paymentsEnabled;
+
   BudgetRepository get _repo => di<BudgetRepository>();
+
+  /// O botão "Copiar link de pagamento" só aparece para orçamentos aprovados/
+  /// em impressão/concluídos, com saldo em aberto e integração ativa.
+  bool canCopyPaymentLink(Budget b) =>
+      paymentsEnabled &&
+      b.balanceDueCents > 0 &&
+      const {
+        BudgetStatus.approved,
+        BudgetStatus.printing,
+        BudgetStatus.completed,
+      }.contains(b.status);
 
   List<FormaMenuItem> menuFor(Budget b, {bool includeOpen = true}) {
     final transitions = b.status.allowedTransitions.toList()
@@ -229,6 +246,12 @@ class BudgetActions {
               : 'Compartilhar com o cliente',
           icon: Icons.ios_share_rounded,
           onTap: () => unawaited(share(b)),
+        ),
+      if (canCopyPaymentLink(b))
+        FormaMenuItem(
+          label: 'Copiar link de pagamento',
+          icon: Icons.link_rounded,
+          onTap: () => unawaited(copyPaymentLink(b)),
         ),
       if (b.status.isEditable)
         FormaMenuItem(
@@ -296,6 +319,38 @@ class BudgetActions {
       );
     } on ApiError catch (e) {
       if (context.mounted) Toasts.error(context, e);
+    }
+  }
+
+  /// Gera (ou reaproveita) o link de pagamento e copia para a área de
+  /// transferência. Só copia URLs https da InfinitePay.
+  Future<void> copyPaymentLink(Budget b) async {
+    try {
+      final link = await di<PaymentRepository>().createBudgetPaymentLink(b.id);
+      if (!isInfinitePayUrl(link.checkoutUrl)) {
+        AppLogger.warning(
+          'Link de pagamento com host inesperado foi descartado',
+          category: 'payments',
+        );
+        if (context.mounted) {
+          Toasts.error(
+            context,
+            const BusinessError('O link de pagamento recebido é inválido.'),
+          );
+        }
+        return;
+      }
+      await Clipboard.setData(ClipboardData(text: link.checkoutUrl));
+      if (!context.mounted) return;
+      Toasts.success(
+        context,
+        'Link de pagamento copiado',
+        description: '${link.kind.label} · ${Fmt.cents(link.amountCents)}',
+      );
+    } on ApiError catch (e) {
+      if (context.mounted) Toasts.error(context, e);
+    } on Object catch (e, st) {
+      _unexpected(e, st, 'copy_payment_link');
     }
   }
 

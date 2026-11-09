@@ -375,6 +375,7 @@ class BudgetDraft extends Equatable {
     this.paymentTerms = '',
     this.notes = '',
     this.validUntil,
+    this.depositPercent,
     this.items = const [BudgetItemDraft(key: 0)],
   });
 
@@ -401,6 +402,7 @@ class BudgetDraft extends Equatable {
     paymentTerms: b.paymentTerms ?? '',
     notes: b.notes ?? '',
     validUntil: b.validUntil,
+    depositPercent: b.depositPercent,
     items: [
       for (final (i, item) in b.items.indexed)
         BudgetItemDraft.fromItem(item, i),
@@ -431,6 +433,9 @@ class BudgetDraft extends Equatable {
   final String paymentTerms;
   final String notes;
   final DateTime? validUntil;
+
+  /// Sinal (%) cobrado na aprovação; `null` = pagamento integral.
+  final double? depositPercent;
   final List<BudgetItemDraft> items;
 
   int get nextItemKey =>
@@ -447,6 +452,9 @@ class BudgetDraft extends Equatable {
       'discount': 'O desconto percentual deve ser no máximo 100%.',
     if (taxRate != null && (taxRate! < 0 || taxRate! >= 100))
       'tax': 'A alíquota deve estar entre 0 e 99,99%.',
+    if (depositPercent != null &&
+        (depositPercent! <= 0 || depositPercent! > 100))
+      'deposit': 'O sinal deve estar entre 0 e 100%.',
     for (final (i, item) in items.indexed) ...{
       if (item.productName.trim().isEmpty)
         'item.$i.name': 'Informe o nome do produto.',
@@ -482,6 +490,7 @@ class BudgetDraft extends Equatable {
     String? paymentTerms,
     String? notes,
     DateTime? Function()? validUntil,
+    double? Function()? depositPercent,
     List<BudgetItemDraft>? items,
   }) => BudgetDraft(
     name: name ?? this.name,
@@ -510,6 +519,9 @@ class BudgetDraft extends Equatable {
     paymentTerms: paymentTerms ?? this.paymentTerms,
     notes: notes ?? this.notes,
     validUntil: validUntil == null ? this.validUntil : validUntil(),
+    depositPercent: depositPercent == null
+        ? this.depositPercent
+        : depositPercent(),
     items: items ?? this.items,
   );
 
@@ -544,6 +556,7 @@ class BudgetDraft extends Equatable {
       'delivery_days': deliveryDays,
       'payment_terms': _nullIfBlank(paymentTerms),
       'notes': _nullIfBlank(notes),
+      'deposit_percent': depositPercent,
       'items': itemsJson,
     };
   }
@@ -558,7 +571,7 @@ class BudgetDraft extends Equatable {
   Json toPreviewJson() => compactJson(_base(forPreview: true));
 
   /// `PUT /budgets/{id}` — os campos "limpáveis" vão explícitos como `null`
-  /// (tax_rate → padrão da empresa, desconto, frete manual, validade).
+  /// (tax_rate → padrão da empresa, desconto, frete manual, validade, sinal).
   Json toUpdateJson() {
     final base = compactJson(_base(forPreview: false));
     return {
@@ -568,6 +581,7 @@ class BudgetDraft extends Equatable {
       'shipping_override': _shippingOverrideCents,
       'tax_rate': taxRate,
       'valid_until': validUntil == null ? null : _endOfDay(validUntil!),
+      'deposit_percent': depositPercent,
     };
   }
 
@@ -593,6 +607,7 @@ class BudgetDraft extends Equatable {
     paymentTerms,
     notes,
     validUntil,
+    depositPercent,
     items,
   ];
 }

@@ -29,6 +29,8 @@ import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/notifications/data/api_notification_repository.dart';
 import 'package:spooliq_desktop/features/notifications/data/local_system_notifier.dart';
 import 'package:spooliq_desktop/features/notifications/domain/notification.dart';
+import 'package:spooliq_desktop/features/payments/data/api_payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
 import 'package:spooliq_desktop/features/presets/data/api_preset_repository.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 import 'package:spooliq_desktop/features/subscription/data/api_billing_repository.dart';
@@ -78,6 +80,7 @@ Future<void> configureDependencies(AppConfig config) async {
     ..registerLazySingleton<CatalogRepository>(() => ApiCatalogRepository(api))
     ..registerLazySingleton<PresetRepository>(() => ApiPresetRepository(api))
     ..registerLazySingleton<CompanyRepository>(() => ApiCompanyRepository(api))
+    ..registerLazySingleton<PaymentRepository>(() => ApiPaymentRepository(api))
     // (customers/catalog registrations)
     ..registerLazySingleton<UserRepository>(() => ApiUserRepository(api))
     // (settings registrations)
