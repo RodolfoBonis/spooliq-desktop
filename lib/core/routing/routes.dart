@@ -26,6 +26,7 @@ abstract final class Routes {
   static const company = '/settings/company';
   static const branding = '/settings/branding';
   static const users = '/settings/users';
+  static const payments = '/settings/payments';
   static const account = '/account';
   static const subscription = '/settings/subscription';
   static const admin = '/admin';
@@ -180,6 +181,21 @@ const navigation = <NavGroup>[
         icon: Icons.palette_outlined,
         visible: _manage,
         keywords: ['branding', 'cores'],
+      ),
+      NavEntry(
+        path: Routes.payments,
+        label: 'Pagamentos',
+        icon: Icons.account_balance_wallet_outlined,
+        visible: _manage,
+        keywords: [
+          'infinitepay',
+          'pix',
+          'cartão',
+          'cobrança',
+          'link',
+          'sinal',
+          'parcelas',
+        ],
       ),
       NavEntry(
         path: Routes.users,

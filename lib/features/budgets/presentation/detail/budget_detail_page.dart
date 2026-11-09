@@ -22,6 +22,9 @@ import 'package:spooliq_desktop/features/catalog/domain/catalog.dart';
 import 'package:spooliq_desktop/features/catalog/presentation/widgets/filament_swatch.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
 import 'package:spooliq_desktop/features/models3d/viewer/model_preview.dart';
+import 'package:spooliq_desktop/features/payments/domain/budget_payment.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_urls.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BudgetDetailPage extends StatelessWidget {
   const BudgetDetailPage({required this.id, super.key});
@@ -33,7 +36,7 @@ class BudgetDetailPage extends StatelessWidget {
     return BlocProvider(
       key: ValueKey(id),
       create: (_) {
-        final cubit = BudgetDetailCubit(di(), id);
+        final cubit = BudgetDetailCubit(di(), di(), id);
         unawaited(cubit.load());
         return cubit;
       },
@@ -51,7 +54,12 @@ class BudgetDetailPage extends StatelessWidget {
                   )
                 : const LoadingView();
           }
-          return _DetailView(budget: budget, history: state.history);
+          return _DetailView(
+            budget: budget,
+            history: state.history,
+            payments: state.payments,
+            paymentsEnabled: state.paymentsEnabled,
+          );
         },
       ),
     );
@@ -59,10 +67,17 @@ class BudgetDetailPage extends StatelessWidget {
 }
 
 class _DetailView extends StatelessWidget {
-  const _DetailView({required this.budget, required this.history});
+  const _DetailView({
+    required this.budget,
+    required this.history,
+    required this.payments,
+    required this.paymentsEnabled,
+  });
 
   final Budget budget;
   final List<StatusChange> history;
+  final List<BudgetPayment> payments;
+  final bool paymentsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +88,7 @@ class _DetailView extends StatelessWidget {
     final actions = BudgetActions(
       context: context,
       user: user,
+      paymentsEnabled: paymentsEnabled,
       onChanged: (b) {
         if (b.id == budget.id) {
           cubit.replace(b);
@@ -132,6 +148,13 @@ class _DetailView extends StatelessWidget {
             icon: const Icon(Icons.ios_share_rounded, size: 16),
             onPressed: () => unawaited(actions.share(budget)),
           ),
+        if (actions.canCopyPaymentLink(budget))
+          FormaButton.secondary(
+            label: 'Copiar link de pagamento',
+            small: true,
+            icon: const Icon(Icons.link_rounded, size: 16),
+            onPressed: () => unawaited(actions.copyPaymentLink(budget)),
+          ),
         if (next != null)
           FormaButton.primary(
             label: next.actionLabel,
@@ -153,7 +176,11 @@ class _DetailView extends StatelessWidget {
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= 1100;
           final main = _MainColumn(budget: budget, actions: actions);
-          final side = _SideColumn(budget: budget, history: history);
+          final side = _SideColumn(
+            budget: budget,
+            history: history,
+            payments: payments,
+          );
           if (!wide) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -245,6 +272,8 @@ class _MainColumn extends StatelessWidget {
               _Info('Máquina', b.machinePreset?.name ?? '—'),
               _Info('Energia', b.energyPreset?.name ?? '—'),
               _Info('Custos', b.costPreset?.name ?? '—'),
+              if (b.depositPercent != null)
+                _Info('Sinal', '${Fmt.plain(b.depositPercent)}%'),
               if (b.paymentTerms != null)
                 _Info('Pagamento', b.paymentTerms!, wide: true),
               if (b.notes != null) _Info('Observações', b.notes!, wide: true),
@@ -477,10 +506,18 @@ class _ItemCard extends StatelessWidget {
 }
 
 class _SideColumn extends StatelessWidget {
-  const _SideColumn({required this.budget, required this.history});
+  const _SideColumn({
+    required this.budget,
+    required this.history,
+    required this.payments,
+  });
 
   final Budget budget;
   final List<StatusChange> history;
+  final List<BudgetPayment> payments;
+
+  bool get _showPayment =>
+      budget.paymentStatus != PaymentStatus.unpaid || payments.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -495,6 +532,10 @@ class _SideColumn extends StatelessWidget {
           title: 'Resumo',
           child: PriceSummary(budget: budget),
         ),
+        if (_showPayment) ...[
+          const SizedBox(height: 16),
+          _PaymentCard(budget: budget, payments: payments),
+        ],
         const SizedBox(height: 16),
         SectionCard(
           title: 'Composição do preço',
@@ -551,6 +592,263 @@ class _SideColumn extends StatelessWidget {
               : _Timeline(history: history),
         ),
       ],
+    );
+  }
+}
+
+/// Card "Pagamento": badge do status, totais pago/saldo e as linhas de
+/// pagamento (tipo, valor, método, parcelas, data, recibo).
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({required this.budget, required this.payments});
+
+  final Budget budget;
+  final List<BudgetPayment> payments;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final overpaid = budget.amountPaidCents > budget.totalCents;
+    final hasPaidAfterCancel = payments.any((p) => p.isPaidAfterCancel);
+
+    return SectionCard(
+      title: 'Pagamento',
+      trailing: _StatusBadge(status: budget.paymentStatus),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _Amount(
+                  label: 'Pago',
+                  value: Fmt.cents(budget.amountPaidCents),
+                  color: ext.successText,
+                ),
+              ),
+              Expanded(
+                child: _Amount(
+                  label: 'Saldo',
+                  value: Fmt.cents(budget.balanceDueCents),
+                  color: ext.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          if (overpaid) ...[
+            const SizedBox(height: 10),
+            _Note(
+              icon: Icons.info_outline_rounded,
+              bg: ext.warningSurface,
+              fg: ext.warningText,
+              text:
+                  'Valor pago maior que o total — o comprador assumiu os juros '
+                  'do parcelamento.',
+            ),
+          ],
+          if (hasPaidAfterCancel) ...[
+            const SizedBox(height: 10),
+            _Note(
+              icon: Icons.warning_amber_rounded,
+              bg: ext.errorSurface,
+              fg: ext.errorText,
+              text:
+                  'Pagamento recebido após o cancelamento — reembolse pela '
+                  'InfinitePay.',
+            ),
+          ],
+          if (payments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Divider(color: ext.border, height: 1),
+            for (final p in payments) ...[
+              const SizedBox(height: 10),
+              _PaymentRow(payment: p),
+            ],
+          ] else ...[
+            const SizedBox(height: 10),
+            Text(
+              'Nenhuma cobrança registrada ainda.',
+              style: typo.body13.copyWith(color: ext.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final PaymentStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final (bg, fg) = switch (status) {
+      PaymentStatus.paid => (ext.successSurface, ext.successText),
+      PaymentStatus.partial => (ext.warningSurface, ext.warningText),
+      PaymentStatus.unpaid => (ext.appBackground, ext.textMuted),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status.label,
+        style: typo.caption12Med.copyWith(color: fg),
+      ),
+    );
+  }
+}
+
+class _Amount extends StatelessWidget {
+  const _Amount({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: typo.caption12.copyWith(color: ext.textHint)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: typo.title15.copyWith(
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PaymentRow extends StatelessWidget {
+  const _PaymentRow({required this.payment});
+
+  final BudgetPayment payment;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final p = payment;
+    final meta = [
+      p.methodLabel,
+      if ((p.installments ?? 1) > 1) '${p.installments}x',
+      if (p.paidAt != null) Fmt.date(p.paidAt),
+    ].where((s) => s != '—').join(' · ');
+    final canOpenReceipt = isInfinitePayUrl(p.receiptUrl);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                p.kind.label,
+                style: typo.body14Medium.copyWith(color: ext.textPrimary),
+              ),
+            ),
+            Text(
+              Fmt.cents(p.amountCents),
+              style: typo.body14.copyWith(
+                color: ext.textPrimary,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                meta.isEmpty ? _statusLabel(p.status) : meta,
+                style: typo.caption12.copyWith(color: ext.textMuted),
+              ),
+            ),
+            if (p.isPaid && p.paidAmountCents != p.amountCents)
+              Text(
+                'Pago ${Fmt.cents(p.paidAmountCents)}',
+                style: typo.caption12.copyWith(color: ext.textMuted),
+              ),
+          ],
+        ),
+        if (canOpenReceipt)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => unawaited(launchUrl(Uri.parse(p.receiptUrl!))),
+              icon: const Icon(Icons.receipt_long_outlined, size: 15),
+              label: const Text('Recibo'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static String _statusLabel(BudgetPaymentStatus s) => switch (s) {
+    BudgetPaymentStatus.pending => 'Aguardando pagamento',
+    BudgetPaymentStatus.paid => 'Pago',
+    BudgetPaymentStatus.refunded => 'Estornado',
+    BudgetPaymentStatus.canceled => 'Cancelado',
+    BudgetPaymentStatus.failed => 'Falhou',
+  };
+}
+
+class _Note extends StatelessWidget {
+  const _Note({
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final typo = context.formaTypography;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: fg),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: typo.caption12.copyWith(color: fg)),
+          ),
+        ],
+      ),
     );
   }
 }

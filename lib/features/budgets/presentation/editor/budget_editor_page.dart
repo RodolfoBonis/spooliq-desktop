@@ -43,6 +43,7 @@ class BudgetEditorPage extends StatelessWidget {
           presets: di(),
           company: di(),
           customers: di(),
+          payments: di(),
           budgetId: budgetId,
           initialCustomerId: customerId,
         );
@@ -564,6 +565,8 @@ class _Form extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
+              _DepositField(state: state),
+              const SizedBox(height: 12),
               DraftTextField(
                 label: 'Observações',
                 value: d.notes,
@@ -682,4 +685,70 @@ class _Form extends StatelessWidget {
     ],
     onChanged: onChanged,
   );
+}
+
+/// Campo "Sinal (%)" das Condições comerciais. Desabilitado (com link para
+/// as Configurações) enquanto a InfinitePay não está conectada.
+class _DepositField extends StatelessWidget {
+  const _DepositField({required this.state});
+
+  final BudgetEditorState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<BudgetEditorCubit>();
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final d = state.draft;
+    final connected = state.lookups.payments?.connected ?? false;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 200,
+          child: FormaNumberField(
+            label: 'Sinal (%)',
+            value: d.depositPercent,
+            decimals: 2,
+            min: 0,
+            max: 100,
+            suffixText: '%',
+            enabled: connected,
+            errorText: state.errors['deposit'],
+            helperText: connected ? 'Vazio = pagamento integral' : null,
+            onChanged: (v) => cubit.update(
+              (d) => d.copyWith(depositPercent: () => v?.toDouble()),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        if (!connected)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 22),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'Conecte a InfinitePay para cobrar sinal no link. ',
+                    style: typo.caption12.copyWith(color: ext.textHint),
+                  ),
+                  InkWell(
+                    onTap: () => context.go(Routes.payments),
+                    child: Text(
+                      'Abrir Configurações → Pagamentos',
+                      style: typo.caption12.copyWith(
+                        color: ext.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

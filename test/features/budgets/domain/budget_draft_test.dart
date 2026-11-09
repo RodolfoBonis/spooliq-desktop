@@ -46,6 +46,13 @@ void main() {
     expect(json['discount_value'], 15);
     expect(json.containsKey('tax_rate'), isFalse);
     expect(json.containsKey('valid_until'), isFalse);
+    // Sem sinal definido, o campo é omitido na criação.
+    expect(json.containsKey('deposit_percent'), isFalse);
+  });
+
+  test('create JSON includes the deposit when set', () {
+    final json = draft.copyWith(depositPercent: () => 50).toCreateJson();
+    expect(json['deposit_percent'], 50);
   });
 
   test('update JSON sends clearable fields explicitly as null', () {
@@ -58,6 +65,14 @@ void main() {
     expect(json['discount_value'], isNull);
     expect(json['shipping_override'], isNull);
     expect(json['valid_until'], isNull);
+    // O sinal é limpável: vai explícito como null para apagar no servidor.
+    expect(json.containsKey('deposit_percent'), isTrue);
+    expect(json['deposit_percent'], isNull);
+  });
+
+  test('update JSON keeps a set deposit', () {
+    final json = draft.copyWith(depositPercent: () => 30).toUpdateJson();
+    expect(json['deposit_percent'], 30);
   });
 
   test('preview JSON only includes complete items', () {
@@ -76,11 +91,26 @@ void main() {
     expect(draft.validate(), isEmpty);
   });
 
+  test('validate rejects an out-of-range deposit', () {
+    expect(
+      draft.copyWith(depositPercent: () => 0).validate(),
+      contains('deposit'),
+    );
+    expect(
+      draft.copyWith(depositPercent: () => 120).validate(),
+      contains('deposit'),
+    );
+    expect(draft.copyWith(depositPercent: () => 50).validate(), isEmpty);
+  });
+
   test('fromBudget round-trips the editable fields', () {
-    final d = BudgetDraft.fromBudget(Budget.fromJson(budgetJson()));
+    final d = BudgetDraft.fromBudget(
+      Budget.fromJson(budgetJson(depositPercent: 40)),
+    );
     expect(d.name, 'Kit organizadores');
     expect(d.customerName, 'Ana Souza');
     expect(d.discountType, DiscountType.percent);
+    expect(d.depositPercent, 40);
     expect(d.items.single.filaments.first.filamentId, 'f-1');
     expect(d.items.single.filaments.first.label, 'PLA Basic · Preto');
   });

@@ -482,6 +482,24 @@ enum DiscountType {
   };
 }
 
+/// Situação de pagamento do orçamento (agregado dos pagamentos pagos).
+enum PaymentStatus {
+  unpaid('unpaid', 'A receber'),
+  partial('partial', 'Parcial'),
+  paid('paid', 'Pago');
+
+  const PaymentStatus(this.value, this.label);
+
+  final String value;
+  final String label;
+
+  static PaymentStatus fromValue(String? v) => switch (v) {
+    'partial' => partial,
+    'paid' => paid,
+    _ => unpaid,
+  };
+}
+
 /// Orçamento completo (`BudgetResponse`). Também é o retorno de `/preview`.
 class Budget extends Equatable {
   const Budget({
@@ -530,6 +548,11 @@ class Budget extends Equatable {
     this.paymentTerms,
     this.notes,
     this.pdfUrl,
+    this.depositPercent,
+    this.paymentStatus = PaymentStatus.unpaid,
+    this.amountPaidCents = 0,
+    this.balanceDueCents = 0,
+    this.paidAt,
     this.createdAt,
     this.updatedAt,
   });
@@ -576,6 +599,15 @@ class Budget extends Equatable {
     paymentTerms: json.strOrNull('payment_terms'),
     notes: json.strOrNull('notes'),
     pdfUrl: json.strOrNull('pdf_url'),
+    depositPercent: json.dblOrNull('deposit_percent'),
+    paymentStatus: PaymentStatus.fromValue(json.strOrNull('payment_status')),
+    amountPaidCents: json.integer('amount_paid'),
+    balanceDueCents: json.integer(
+      'balance_due',
+      // Sem o campo, o saldo é o que falta do total.
+      json.integer('total_cost') - json.integer('amount_paid'),
+    ),
+    paidAt: json.date('paid_at'),
     items: json.list('items', BudgetItem.fromJson)
       ..sort((a, b) => a.order.compareTo(b.order)),
     stockWarnings: json.list('stock_warnings', StockWarning.fromJson),
@@ -626,6 +658,22 @@ class Budget extends Equatable {
   final String? paymentTerms;
   final String? notes;
   final String? pdfUrl;
+
+  /// Sinal (%) definido para este orçamento; `null` = pagamento integral.
+  final double? depositPercent;
+
+  /// Situação de pagamento agregada.
+  final PaymentStatus paymentStatus;
+
+  /// Total já pago (centavos).
+  final int amountPaidCents;
+
+  /// Saldo em aberto (centavos).
+  final int balanceDueCents;
+
+  /// Quando o orçamento foi integralmente pago.
+  final DateTime? paidAt;
+
   final List<BudgetItem> items;
   final List<StockWarning> stockWarnings;
   final List<StatusChange> statusHistory;
@@ -694,6 +742,11 @@ class Budget extends Equatable {
       paymentTerms: b.paymentTerms,
       notes: b.notes,
       pdfUrl: b.pdfUrl,
+      depositPercent: b.depositPercent,
+      paymentStatus: b.paymentStatus,
+      amountPaidCents: b.amountPaidCents,
+      balanceDueCents: b.balanceDueCents,
+      paidAt: b.paidAt,
       items: b.items,
       stockWarnings: b.stockWarnings,
       statusHistory: b.statusHistory,
@@ -712,5 +765,8 @@ class Budget extends Equatable {
     updatedAt,
     items,
     publicToken,
+    paymentStatus,
+    amountPaidCents,
+    balanceDueCents,
   ];
 }

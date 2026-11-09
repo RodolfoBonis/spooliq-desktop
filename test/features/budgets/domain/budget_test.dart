@@ -104,6 +104,30 @@ void main() {
       expect(b.usesLegacyCalculation, isFalse);
     });
 
+    test('defaults the payment aggregate when fields are absent', () {
+      expect(b.depositPercent, isNull);
+      expect(b.paymentStatus, PaymentStatus.unpaid);
+      expect(b.amountPaidCents, 0);
+      // Sem balance_due, o saldo é o total inteiro.
+      expect(b.balanceDueCents, 25990);
+    });
+
+    test('reads the payment fields when present', () {
+      final paid = Budget.fromJson(
+        budgetJson(
+          status: 'approved',
+          depositPercent: 50,
+          paymentStatus: 'partial',
+          amountPaid: 1000,
+          balanceDue: 24990,
+        ),
+      );
+      expect(paid.depositPercent, 50);
+      expect(paid.paymentStatus, PaymentStatus.partial);
+      expect(paid.amountPaidCents, 1000);
+      expect(paid.balanceDueCents, 24990);
+    });
+
     for (final missing in [
       'setup_time_minutes',
       'manual_labor_minutes_total',
@@ -127,6 +151,16 @@ void main() {
       expect(moved.status, BudgetStatus.sent);
       expect(moved.totalCents, b.totalCents);
       expect(moved.items, b.items);
+    });
+
+    test('copyWithStatus keeps the payment aggregate', () {
+      final paid = Budget.fromJson(
+        budgetJson(paymentStatus: 'paid', amountPaid: 25990, balanceDue: 0),
+      );
+      final moved = paid.copyWithStatus(BudgetStatus.completed);
+      expect(moved.paymentStatus, PaymentStatus.paid);
+      expect(moved.amountPaidCents, 25990);
+      expect(moved.balanceDueCents, 0);
     });
   });
 }

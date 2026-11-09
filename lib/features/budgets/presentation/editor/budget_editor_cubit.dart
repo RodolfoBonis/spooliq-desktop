@@ -11,6 +11,8 @@ import 'package:spooliq_desktop/features/company/domain/company.dart';
 import 'package:spooliq_desktop/features/company/domain/company_repository.dart';
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/models3d/domain/model3d.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 
@@ -24,6 +26,7 @@ class EditorLookups extends Equatable {
     this.energy = const [],
     this.costs = const [],
     this.company,
+    this.payments,
   });
 
   final List<PrintProfile> profiles;
@@ -32,8 +35,18 @@ class EditorLookups extends Equatable {
   final List<Preset> costs;
   final Company? company;
 
+  /// Integração de pagamentos; `null` enquanto não carrega ou em erro.
+  final PaymentSettings? payments;
+
   @override
-  List<Object?> get props => [profiles, machines, energy, costs, company];
+  List<Object?> get props => [
+    profiles,
+    machines,
+    energy,
+    costs,
+    company,
+    payments,
+  ];
 }
 
 class BudgetEditorState extends Equatable {
@@ -116,6 +129,7 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
     required PresetRepository presets,
     required CompanyRepository company,
     required CustomerRepository customers,
+    required PaymentRepository payments,
     this.budgetId,
     this.initialCustomerId,
     this.previewDebounce = const Duration(milliseconds: 400),
@@ -123,12 +137,14 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
        _presets = presets,
        _company = company,
        _customers = customers,
+       _payments = payments,
        super(const BudgetEditorState());
 
   final BudgetRepository _budgets;
   final PresetRepository _presets;
   final CompanyRepository _company;
   final CustomerRepository _customers;
+  final PaymentRepository _payments;
   final String? budgetId;
   final String? initialCustomerId;
   final Duration previewDebounce;
@@ -162,9 +178,14 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
         final defaultProfile = lookups.profiles
             .where((p) => p.isDefault)
             .firstOrNull;
+        final payments = lookups.payments;
         draft = draft.copyWith(
           profileId: () => defaultProfile?.id,
           paymentTerms: lookups.company?.defaultPaymentTerms ?? '',
+          // Rascunho novo herda o sinal padrão quando a integração está ligada.
+          depositPercent: () => payments != null && payments.isActive
+              ? payments.defaultDepositPercent
+              : null,
         );
         if (initialCustomerId != null) {
           final customer = await _customers.get(initialCustomerId!);
@@ -205,12 +226,20 @@ class BudgetEditorCubit extends Cubit<BudgetEditorState> {
     } on ApiError catch (e) {
       AppLogger.warning('Empresa indisponível no editor', error: e);
     }
+    PaymentSettings? payments;
+    try {
+      payments = await _payments.getSettings();
+    } on ApiError catch (e) {
+      // Pagamentos são opcionais: o editor funciona sem a integração.
+      AppLogger.warning('Pagamentos indisponíveis no editor', error: e);
+    }
     return EditorLookups(
       profiles: (await profiles).items,
       machines: await machines,
       energy: await energy,
       costs: await costs,
       company: company,
+      payments: payments,
     );
   }
 

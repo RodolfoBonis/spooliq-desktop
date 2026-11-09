@@ -25,6 +25,8 @@ import 'package:spooliq_desktop/features/company/presentation/current_company_cu
 import 'package:spooliq_desktop/features/customers/domain/customer_repository.dart';
 import 'package:spooliq_desktop/features/dashboard/domain/dashboard.dart';
 import 'package:spooliq_desktop/features/notifications/domain/notification.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset.dart';
 import 'package:spooliq_desktop/features/presets/domain/preset_repository.dart';
 
@@ -49,6 +51,8 @@ class _Company extends Mock implements CompanyRepository {}
 
 class _Customers extends Mock implements CustomerRepository {}
 
+class _Payments extends Mock implements PaymentRepository {}
+
 class _Session extends Mock implements SessionCubit {}
 
 /// Qualquer chamada falha como se estivesse offline.
@@ -69,6 +73,7 @@ void main() {
     final presets = _Presets();
     final company = _Company();
     final customers = _Customers();
+    final payments = _Payments();
     when(
       () => customers.list(page: any(named: 'page')),
     ).thenAnswer((_) async => const Paginated.empty());
@@ -77,12 +82,16 @@ void main() {
     when(
       company.get,
     ).thenAnswer((_) async => const Company(id: 'c', name: 'Loja'));
+    when(
+      payments.getSettings,
+    ).thenAnswer((_) async => const PaymentSettings());
     di
       ..allowReassignment = true
       ..registerSingleton<BudgetRepository>(_Budgets())
       ..registerSingleton<PresetRepository>(presets)
       ..registerSingleton<CompanyRepository>(company)
       ..registerSingleton<CustomerRepository>(customers)
+      ..registerSingleton<PaymentRepository>(payments)
       ..registerSingleton<DashboardRepository>(_OfflineDashboard())
       ..registerSingleton<NetworkStatus>(NetworkStatus())
       ..registerSingleton<NotificationRepository>(_Notifications())
