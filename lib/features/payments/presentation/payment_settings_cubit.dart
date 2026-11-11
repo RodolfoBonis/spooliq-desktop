@@ -19,7 +19,8 @@ const _feeRateMissingMessage =
     'Cadastre a taxa do crédito nas parcelas sem juros antes de embutir a '
     'taxa no preço.';
 const _feeRateInvalidMessage =
-    'Confira as taxas: use valores de 0 a 30% com até 2 casas decimais.';
+    'Alguma taxa está fora do limite (0 a 30%) ou tem mais de 2 casas '
+    'decimais.';
 
 /// Mensagens de validação das taxas.
 const feeRangeMessage = 'A taxa deve estar entre 0 e 30%.';

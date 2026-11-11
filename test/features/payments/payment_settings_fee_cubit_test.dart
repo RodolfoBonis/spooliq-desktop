@@ -55,7 +55,8 @@ void main() {
           statusCode: 422,
         ),
       ),
-      contains('0 a 30%'),
+      'Alguma taxa está fora do limite (0 a 30%) ou tem mais de 2 casas '
+      'decimais.',
     );
   });
 
