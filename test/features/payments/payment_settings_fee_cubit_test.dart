@@ -178,4 +178,57 @@ void main() {
     },
     verify: (c) => expect(c.state.saveError, contains('Cadastre a taxa')),
   );
+
+  blocTest<PaymentSettingsCubit, PaymentSettingsState>(
+    'rounds fee rates to 2 decimals in the setters',
+    setUp: () =>
+        when(() => repo.getSettings()).thenAnswer((_) async => connected),
+    build: () => PaymentSettingsCubit(repo),
+    act: (c) async {
+      await c.load();
+      c
+        ..setPixRate(4.567)
+        ..setCredit1xRate(4.999)
+        ..setInstallmentRate(3, 6.001);
+    },
+    verify: (c) {
+      expect(c.state.pixRate, 4.57);
+      expect(c.state.credit1xRate, 5.0);
+      expect(c.state.installmentRates[3], 6.0);
+    },
+  );
+
+  test('validate() rejects more than 2 decimals', () {
+    const state = PaymentSettingsState(
+      status: PaymentSettingsStatus.ready,
+      original: connected,
+      handle: 'loja',
+      pixRate: 4.999,
+    );
+    expect(
+      state.validate(),
+      containsPair('fee_pix', 'Use no máximo 2 casas decimais.'),
+    );
+  });
+
+  blocTest<PaymentSettingsCubit, PaymentSettingsState>(
+    're-checks the reference rate when the installments change with embed on',
+    setUp: () =>
+        when(() => repo.getSettings()).thenAnswer((_) async => connected),
+    build: () => PaymentSettingsCubit(repo),
+    act: (c) async {
+      await c.load();
+      // 3x cadastrada e embute: válido enquanto as parcelas sem juros são 3.
+      c
+        ..setInstallmentRate(3, 6.1)
+        ..setEmbedFeeInPrice(embed: true);
+      expect(c.state.validate(), isEmpty);
+      // Passa a absorver até 6x, sem taxa de 6x → referência some.
+      c.setInstallments(6);
+    },
+    verify: (c) {
+      expect(c.state.referenceFeeRate, isNull);
+      expect(c.state.validate(), containsPair('embed_fee', contains('6x')));
+    },
+  );
 }

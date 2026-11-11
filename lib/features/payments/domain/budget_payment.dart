@@ -133,6 +133,9 @@ class BudgetPayment extends Equatable {
   /// manual pela InfinitePay).
   bool get isPaidAfterCancel => statusReason == 'paid_after_cancel';
 
+  /// Pago e contado no agregado (exclui `paid_after_cancel`).
+  bool get isPaidCounted => isPaid && !isPaidAfterCancel;
+
   /// Rótulo do método: Pix, Cartão ou "—".
   String get methodLabel => switch (captureMethod) {
     null || '' => '—',
@@ -188,9 +191,6 @@ class BudgetPaymentsResult extends Equatable {
 
   /// Líquido total recebido; `null` = desconhecido.
   final int? netReceivedCents;
-
-  /// Há estimativa de líquido total para exibir.
-  bool get hasNetReceived => netReceivedCents != null;
 
   @override
   List<Object?> get props => [

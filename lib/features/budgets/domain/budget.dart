@@ -801,6 +801,7 @@ class Budget extends Equatable {
     amountPaidCents,
     balanceDueCents,
     amountRefundDueCents,
+    paymentFeeRateApplied,
     paymentFeeAmountCents,
   ];
 }

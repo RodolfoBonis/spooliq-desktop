@@ -20,6 +20,7 @@ void main() {
       expect(p.netAmountCents, 19997);
       expect(p.feeRatePercent, 7.9);
       expect(p.hasFeeEstimate, isTrue);
+      expect(p.isPaidCounted, isTrue);
     });
 
     test('an absent estimate stays null and hasFeeEstimate is false', () {
@@ -33,6 +34,18 @@ void main() {
       expect(p.netAmountCents, isNull);
       expect(p.feeRatePercent, isNull);
       expect(p.hasFeeEstimate, isFalse);
+    });
+
+    test('a paid_after_cancel line is not counted', () {
+      final p = BudgetPayment.fromJson(const {
+        'kind': 'full',
+        'amount': 1000,
+        'paid_amount': 1000,
+        'status': 'paid',
+        'status_reason': 'paid_after_cancel',
+      });
+      expect(p.isPaid, isTrue);
+      expect(p.isPaidCounted, isFalse);
     });
   });
 
@@ -55,7 +68,6 @@ void main() {
       });
       expect(r.feesCents, 1715);
       expect(r.netReceivedCents, 19997);
-      expect(r.hasNetReceived, isTrue);
     });
 
     test('leaves the totals null when absent (no table configured)', () {
@@ -72,7 +84,6 @@ void main() {
       });
       expect(r.feesCents, isNull);
       expect(r.netReceivedCents, isNull);
-      expect(r.hasNetReceived, isFalse);
     });
   });
 }

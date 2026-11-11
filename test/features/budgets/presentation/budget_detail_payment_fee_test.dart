@@ -28,8 +28,11 @@ void main() {
   Future<void> pumpDetail(
     WidgetTester tester, {
     required BudgetPaymentsResult paymentsResult,
+    String paymentStatus = 'paid',
+    int amountPaid = 21712,
+    int balanceDue = 0,
   }) async {
-    tester.view.physicalSize = const Size(1500, 2200);
+    tester.view.physicalSize = const Size(1500, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -40,9 +43,9 @@ void main() {
         budgetJson(
           status: 'approved',
           total: 21712,
-          paymentStatus: 'paid',
-          amountPaid: 21712,
-          balanceDue: 0,
+          paymentStatus: paymentStatus,
+          amountPaid: amountPaid,
+          balanceDue: balanceDue,
         ),
       ),
     );
@@ -111,15 +114,17 @@ void main() {
     );
 
     expect(find.textContaining('Líquido recebido ≈'), findsOneWidget);
+    expect(find.textContaining('(parcial)'), findsNothing);
     expect(find.textContaining('Você recebe ≈'), findsOneWidget);
     expect(find.textContaining('taxa ≈'), findsOneWidget);
+    expect(find.text('Taxa não cadastrada para este método'), findsNothing);
     expect(
       find.text('Cadastre suas taxas para ver quanto recebe'),
       findsNothing,
     );
   });
 
-  testWidgets('shows the fee CTA when the estimate is unknown', (tester) async {
+  testWidgets('per-line unknown fee shows a note and the CTA', (tester) async {
     await pumpDetail(
       tester,
       paymentsResult: BudgetPaymentsResult(
@@ -136,10 +141,67 @@ void main() {
       ),
     );
 
+    expect(find.text('Taxa não cadastrada para este método'), findsOneWidget);
     expect(
       find.text('Cadastre suas taxas para ver quanto recebe'),
       findsOneWidget,
     );
-    expect(find.textContaining('Líquido recebido ≈'), findsNothing);
+    expect(find.textContaining('Líquido recebido'), findsNothing);
+  });
+
+  testWidgets('labels the total partial when a paid line lacks an estimate', (
+    tester,
+  ) async {
+    await pumpDetail(
+      tester,
+      paymentStatus: 'partial',
+      paymentsResult: BudgetPaymentsResult(
+        feesCents: 1715,
+        netReceivedCents: 19997,
+        payments: [
+          BudgetPayment.fromJson(const {
+            'kind': 'deposit',
+            'amount': 10856,
+            'paid_amount': 10856,
+            'status': 'paid',
+            'fee_amount': 1715,
+            'net_amount': 9141,
+            'fee_rate_percent': 7.9,
+          }),
+          BudgetPayment.fromJson(const {
+            'kind': 'balance',
+            'amount': 10856,
+            'paid_amount': 10856,
+            'status': 'paid',
+          }),
+        ],
+      ),
+    );
+
+    expect(find.textContaining('Líquido recebido (parcial) ≈'), findsOneWidget);
+    expect(find.text('Taxa não cadastrada para este método'), findsOneWidget);
+  });
+
+  testWidgets('hides the total when there are no paid lines', (tester) async {
+    await pumpDetail(
+      tester,
+      paymentStatus: 'partial',
+      amountPaid: 0,
+      balanceDue: 21712,
+      paymentsResult: BudgetPaymentsResult(
+        // net_received == 0 sem linhas pagas: nada a mostrar.
+        netReceivedCents: 0,
+        payments: [
+          BudgetPayment.fromJson(const {
+            'kind': 'full',
+            'amount': 21712,
+            'paid_amount': 0,
+            'status': 'pending',
+          }),
+        ],
+      ),
+    );
+
+    expect(find.textContaining('Líquido recebido'), findsNothing);
   });
 }

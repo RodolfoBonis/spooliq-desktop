@@ -273,8 +273,14 @@ class _FeeRatesCard extends StatelessWidget {
     final cubit = context.read<PaymentSettingsCubit>();
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
-    final saving = state.saving;
     final errors = state.errors;
+    // O PUT exige credenciais: enquanto desconectada, só leitura.
+    final enabled = state.connected && !state.saving;
+    const decimalHint = 'use vírgula para decimais (ex.: 4,99)';
+    final invalidInstallments = [
+      for (final n in kFeeInstallments)
+        if (errors.containsKey('fee_credit_$n')) n,
+    ];
 
     return SectionCard(
       title: 'Taxas da InfinitePay',
@@ -284,37 +290,64 @@ class _FeeRatesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (!state.connected) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ext.infoSurface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: ext.infoText,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Conecte a InfinitePay (acima) para cadastrar as taxas.',
+                      style: typo.body13.copyWith(color: ext.infoText),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 160,
+                width: 180,
                 child: FormaNumberField(
                   key: const ValueKey('fee-pix'),
                   label: 'Pix',
                   value: state.pixRate,
                   decimals: 2,
                   suffixText: '%',
-                  min: 0,
-                  max: 30,
-                  enabled: !saving,
+                  enabled: enabled,
                   errorText: errors['fee_pix'],
+                  helperText: errors['fee_pix'] == null ? decimalHint : null,
                   onChanged: (v) => cubit.setPixRate(v?.toDouble()),
                 ),
               ),
               const SizedBox(width: 12),
               SizedBox(
-                width: 160,
+                width: 180,
                 child: FormaNumberField(
                   key: const ValueKey('fee-credit-1x'),
                   label: 'Crédito à vista',
                   value: state.credit1xRate,
                   decimals: 2,
                   suffixText: '%',
-                  min: 0,
-                  max: 30,
-                  enabled: !saving,
+                  enabled: enabled,
                   errorText: errors['fee_credit_1x'],
+                  helperText: errors['fee_credit_1x'] == null
+                      ? decimalHint
+                      : null,
                   onChanged: (v) => cubit.setCredit1xRate(v?.toDouble()),
                 ),
               ),
@@ -333,22 +366,38 @@ class _FeeRatesCard extends StatelessWidget {
               for (final n in kFeeInstallments)
                 SizedBox(
                   width: 110,
-                  child: FormaNumberField(
-                    key: ValueKey('fee-credit-$n'),
-                    label: '${n}x',
-                    value: state.installmentRates[n],
-                    decimals: 2,
-                    suffixText: '%',
-                    min: 0,
-                    max: 30,
-                    enabled: !saving,
-                    errorText: errors['fee_credit_$n'] == null ? null : '',
-                    onChanged: (v) =>
-                        cubit.setInstallmentRate(n, v?.toDouble()),
+                  child: Semantics(
+                    label: '${n}x, taxa de crédito, percentual',
+                    child: FormaNumberField(
+                      key: ValueKey('fee-credit-$n'),
+                      label: '${n}x',
+                      value: state.installmentRates[n],
+                      decimals: 2,
+                      suffixText: '%',
+                      enabled: enabled,
+                      // Só a borda vermelha; o detalhe vai no resumo abaixo.
+                      errorText: errors.containsKey('fee_credit_$n')
+                          ? ''
+                          : null,
+                      onChanged: (v) =>
+                          cubit.setInstallmentRate(n, v?.toDouble()),
+                    ),
                   ),
                 ),
             ],
           ),
+          if (invalidInstallments.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                'Taxas inválidas em '
+                '${invalidInstallments.map((n) => '${n}x').join(', ')}: '
+                'informe entre 0 e 30%.',
+                style: typo.caption12.copyWith(color: ext.errorColor),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Divider(color: ext.border, height: 1),
           const SizedBox(height: 16),
@@ -357,9 +406,9 @@ class _FeeRatesCard extends StatelessWidget {
             children: [
               FormaSwitch(
                 value: state.embedFeeInPrice,
-                onChanged: saving
-                    ? null
-                    : (v) => cubit.setEmbedFeeInPrice(embed: v),
+                onChanged: enabled
+                    ? (v) => cubit.setEmbedFeeInPrice(embed: v)
+                    : null,
                 semanticLabel: 'Embutir taxa de pagamento no preço',
               ),
               const SizedBox(width: 12),
@@ -379,9 +428,14 @@ class _FeeRatesCard extends StatelessWidget {
                     if (errors['embed_fee'] != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          errors['embed_fee']!,
-                          style: typo.caption12.copyWith(color: ext.errorColor),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            errors['embed_fee']!,
+                            style: typo.caption12.copyWith(
+                              color: ext.errorColor,
+                            ),
+                          ),
                         ),
                       ),
                   ],

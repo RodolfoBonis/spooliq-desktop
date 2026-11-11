@@ -632,17 +632,19 @@ class _PaymentCard extends StatelessWidget {
   final int refundDueCents;
   final int? netReceivedCents;
 
-  /// Há cobrança paga mas sem estimativa de taxa/líquido (tabela não
-  /// cadastrada) — vale oferecer o cadastro das taxas.
-  bool get _showFeeCta =>
-      netReceivedCents == null &&
-      payments.any((p) => p.isPaid && !p.isPaidAfterCancel);
+  /// Linhas pagas e contadas (exclui `paid_after_cancel`).
+  List<BudgetPayment> get _paidCounted =>
+      payments.where((p) => p.isPaidCounted).toList();
+
+  /// Alguma linha paga e contada ficou sem estimativa de taxa/líquido.
+  bool get _anyMissingEstimate => _paidCounted.any((p) => !p.hasFeeEstimate);
 
   @override
   Widget build(BuildContext context) {
     final ext = Theme.of(context).extension<FormaThemeExtension>()!;
     final typo = context.formaTypography;
     final overpaid = budget.amountPaidCents > budget.totalCents;
+    final hasPaid = _paidCounted.isNotEmpty;
 
     return SectionCard(
       title: 'Pagamento',
@@ -668,29 +670,12 @@ class _PaymentCard extends StatelessWidget {
               ),
             ],
           ),
-          if (netReceivedCents != null) ...[
+          if (hasPaid && netReceivedCents != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Líquido recebido ≈ ${Fmt.cents(netReceivedCents)}',
+              'Líquido recebido${_anyMissingEstimate ? ' (parcial)' : ''} '
+              '≈ ${Fmt.cents(netReceivedCents)}',
               style: typo.body13.copyWith(color: ext.textMuted),
-            ),
-          ],
-          if (_showFeeCta) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                onPressed: () => unawaited(context.push(Routes.payments)),
-                icon: const Icon(Icons.percent_rounded, size: 15),
-                label: const Text(
-                  'Cadastre suas taxas para ver quanto recebe',
-                ),
-              ),
             ),
           ],
           if (overpaid) ...[
@@ -880,6 +865,28 @@ class _PaymentRow extends StatelessWidget {
               style: typo.caption12.copyWith(color: ext.textMuted),
             ),
           ),
+        if (p.isPaidCounted && !p.hasFeeEstimate) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'Taxa não cadastrada para este método',
+              style: typo.caption12.copyWith(color: ext.textMuted),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => unawaited(context.push(Routes.payments)),
+              icon: const Icon(Icons.percent_rounded, size: 15),
+              label: const Text('Cadastre suas taxas para ver quanto recebe'),
+            ),
+          ),
+        ],
         if (p.isPaidAfterCancel)
           Padding(
             padding: const EdgeInsets.only(top: 2),

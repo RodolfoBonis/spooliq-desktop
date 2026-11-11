@@ -19,6 +19,10 @@ const _feeRateMissingMessage =
     'Cadastre a taxa do crédito nas parcelas sem juros antes de embutir a '
     'taxa no preço.';
 
+/// Mensagens de validação das taxas.
+const feeRangeMessage = 'A taxa deve estar entre 0 e 30%.';
+const feeDecimalsMessage = 'Use no máximo 2 casas decimais.';
+
 /// Traduz os erros conhecidos da InfinitePay; demais erros mostram a mensagem
 /// que a própria API enviou.
 String friendlyPaymentError(ApiError error) {
@@ -34,6 +38,20 @@ String friendlyPaymentError(ApiError error) {
   }
   if (error.statusCode == 503) return _unavailableMessage;
   return error.message;
+}
+
+/// Arredonda uma taxa para 2 casas decimais (ou mantém `null`).
+double? roundFeeRate(double? value) =>
+    value == null ? null : (value * 100).round() / 100;
+
+/// Erro de validação de uma taxa: fora de faixa ou com casas demais.
+String? feeRateError(double? value) {
+  if (value == null) return null;
+  if (value < 0 || value > 30) return feeRangeMessage;
+  if (((value * 100) - (value * 100).round()).abs() > 1e-9) {
+    return feeDecimalsMessage;
+  }
+  return null;
 }
 
 class PaymentSettingsState extends Equatable {
@@ -111,6 +129,12 @@ class PaymentSettingsState extends Equatable {
     },
   );
 
+  /// Parcelas (2–12) com taxa inválida — para o resumo acessível da grade.
+  List<int> get invalidInstallments => [
+    for (final n in kFeeInstallments)
+      if (feeRateError(installmentRates[n]) != null) n,
+  ];
+
   /// Erros de validação por campo, calculados sob demanda.
   Map<String, String> validate() {
     final errors = <String, String>{};
@@ -137,14 +161,14 @@ class PaymentSettingsState extends Equatable {
     if (deposit != null && (deposit <= 0 || deposit >= 100)) {
       errors['deposit'] = 'O sinal deve ser maior que 0 e menor que 100%.';
     }
-    // Taxas: cada valor informado precisa ficar entre 0 e 30%.
-    const feeRangeMessage = 'A taxa deve estar entre 0 e 30%.';
-    if (!_inFeeRange(pixRate)) errors['fee_pix'] = feeRangeMessage;
-    if (!_inFeeRange(credit1xRate)) errors['fee_credit_1x'] = feeRangeMessage;
+    // Taxas: faixa de 0 a 30% e até 2 casas decimais.
+    final pixError = feeRateError(pixRate);
+    if (pixError != null) errors['fee_pix'] = pixError;
+    final credit1xError = feeRateError(credit1xRate);
+    if (credit1xError != null) errors['fee_credit_1x'] = credit1xError;
     for (final n in kFeeInstallments) {
-      if (!_inFeeRange(installmentRates[n])) {
-        errors['fee_credit_$n'] = feeRangeMessage;
-      }
+      final error = feeRateError(installmentRates[n]);
+      if (error != null) errors['fee_credit_$n'] = error;
     }
     // Para embutir, a taxa de referência precisa estar cadastrada.
     if (embedFeeInPrice && referenceFeeRate == null) {
@@ -155,9 +179,6 @@ class PaymentSettingsState extends Equatable {
     }
     return errors;
   }
-
-  static bool _inFeeRange(double? value) =>
-      value == null || (value >= 0 && value <= 30);
 
   /// Erros exibidos na UI (só após a 1ª tentativa de salvar).
   Map<String, String> get errors => submitted ? validate() : const {};
@@ -306,15 +327,22 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
     state.copyWith(defaultDepositPercent: () => value, saveError: () => null),
   );
 
-  void setPixRate(double? value) =>
-      emit(state.copyWith(pixRate: () => value, saveError: () => null));
+  // As taxas são arredondadas para 2 casas: a UI nunca guarda mais precisão do
+  // que o contrato aceita.
+  void setPixRate(double? value) => emit(
+    state.copyWith(pixRate: () => roundFeeRate(value), saveError: () => null),
+  );
 
-  void setCredit1xRate(double? value) =>
-      emit(state.copyWith(credit1xRate: () => value, saveError: () => null));
+  void setCredit1xRate(double? value) => emit(
+    state.copyWith(
+      credit1xRate: () => roundFeeRate(value),
+      saveError: () => null,
+    ),
+  );
 
   void setInstallmentRate(int installments, double? value) {
     final next = Map<int, double?>.from(state.installmentRates)
-      ..[installments] = value;
+      ..[installments] = roundFeeRate(value);
     emit(state.copyWith(installmentRates: next, saveError: () => null));
   }
 

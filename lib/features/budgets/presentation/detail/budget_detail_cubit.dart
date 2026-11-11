@@ -16,7 +16,6 @@ class BudgetDetailState extends Equatable {
     this.history = const [],
     this.payments = const [],
     this.refundDueCents = 0,
-    this.feesCents,
     this.netReceivedCents,
     this.paymentsEnabled = false,
     this.loading = true,
@@ -34,10 +33,7 @@ class BudgetDetailState extends Equatable {
   /// é confirmado pela lista de pagamentos.
   final int refundDueCents;
 
-  /// Soma das taxas conhecidas; `null` = sem estimativa (sem tabela).
-  final int? feesCents;
-
-  /// Líquido total recebido; `null` = desconhecido.
+  /// Líquido total recebido; `null` = desconhecido (tabela não cadastrada).
   final int? netReceivedCents;
 
   /// A integração está conectada e ligada (habilita gerar link).
@@ -51,7 +47,6 @@ class BudgetDetailState extends Equatable {
     List<StatusChange>? history,
     List<BudgetPayment>? payments,
     int? refundDueCents,
-    int? Function()? feesCents,
     int? Function()? netReceivedCents,
     bool? paymentsEnabled,
     bool? loading,
@@ -62,7 +57,6 @@ class BudgetDetailState extends Equatable {
     history: history ?? this.history,
     payments: payments ?? this.payments,
     refundDueCents: refundDueCents ?? this.refundDueCents,
-    feesCents: feesCents == null ? this.feesCents : feesCents(),
     netReceivedCents: netReceivedCents == null
         ? this.netReceivedCents
         : netReceivedCents(),
@@ -78,7 +72,6 @@ class BudgetDetailState extends Equatable {
     history,
     payments,
     refundDueCents,
-    feesCents,
     netReceivedCents,
     paymentsEnabled,
     loading,
@@ -150,7 +143,6 @@ class BudgetDetailCubit extends Cubit<BudgetDetailState> {
         state.copyWith(
           payments: result.payments,
           refundDueCents: result.refundDueCents,
-          feesCents: () => result.feesCents,
           netReceivedCents: () => result.netReceivedCents,
         ),
       );
