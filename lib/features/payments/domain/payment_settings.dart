@@ -1,6 +1,65 @@
 import 'package:equatable/equatable.dart';
 import 'package:spooliq_desktop/core/network/json.dart';
 
+/// Parcelas do cartão com taxa cadastrável (crédito à vista é tratado à parte).
+const List<int> kFeeInstallments = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+/// Tabela de taxas da InfinitePay por método de pagamento.
+///
+/// Cada taxa é um percentual (0–30, até 2 casas) sobre o valor cobrado.
+/// Uma parcela sem taxa informada é "desconhecida": a estimativa para ela
+/// fica nula. [FeeRates] inteiramente vazio significa não cadastrado.
+class FeeRates extends Equatable {
+  const FeeRates({this.pix, this.credit1x, this.creditInstallments = const {}});
+
+  factory FeeRates.fromJson(Json json) {
+    final installments = <int, double>{};
+    final raw = json.obj('credit_installments');
+    if (raw != null) {
+      for (final entry in raw.entries) {
+        final n = int.tryParse(entry.key);
+        final value = raw.dblOrNull(entry.key);
+        if (n != null && value != null) installments[n] = value;
+      }
+    }
+    return FeeRates(
+      pix: json.dblOrNull('pix'),
+      credit1x: json.dblOrNull('credit_1x'),
+      creditInstallments: installments,
+    );
+  }
+
+  /// Taxa do Pix (`null` = não cadastrada).
+  final double? pix;
+
+  /// Taxa do crédito à vista (`null` = não cadastrada).
+  final double? credit1x;
+
+  /// Taxas por número de parcelas (2–12); ausente = desconhecida.
+  final Map<int, double> creditInstallments;
+
+  /// Alguma taxa cadastrada? Vazio = integração sem tabela.
+  bool get hasAny =>
+      pix != null || credit1x != null || creditInstallments.isNotEmpty;
+
+  /// Taxa do crédito em [installments] parcelas: 1 (ou 0) = crédito à vista,
+  /// N≥2 = `credit_installments[N]`. `null` quando não cadastrada.
+  double? rateForInstallments(int installments) =>
+      installments <= 1 ? credit1x : creditInstallments[installments];
+
+  /// Corpo `fee_rates`. Só inclui taxas informadas (0 é válido; `null` não).
+  Json toJson() => {
+    if (pix != null) 'pix': pix,
+    if (credit1x != null) 'credit_1x': credit1x,
+    'credit_installments': {
+      for (final e in creditInstallments.entries) '${e.key}': e.value,
+    },
+  };
+
+  @override
+  List<Object?> get props => [pix, credit1x, creditInstallments];
+}
+
 /// Configuração da integração de pagamentos (InfinitePay) de uma empresa.
 ///
 /// A chave de API nunca volta da API: só os 4 últimos dígitos ([apiKeyLast4]),
@@ -16,6 +75,8 @@ class PaymentSettings extends Equatable {
     this.pixDiscountPercent = 0,
     this.defaultDepositPercent,
     this.pendingLinks = 0,
+    this.feeRates,
+    this.embedFeeInPrice = false,
   });
 
   factory PaymentSettings.fromJson(Json json) {
@@ -26,6 +87,7 @@ class PaymentSettings extends Equatable {
     final connected =
         j.boolOrNull('connected') ??
         (last4 != null || j.date('verified_at') != null);
+    final feeRatesJson = j.obj('fee_rates');
     return PaymentSettings(
       handle: j.strOrNull('handle'),
       enabled: j.boolean('enabled'),
@@ -38,6 +100,9 @@ class PaymentSettings extends Equatable {
       pixDiscountPercent: j.integer('pix_discount_percent'),
       defaultDepositPercent: j.dblOrNull('default_deposit_percent'),
       pendingLinks: j.integer('pending_links'),
+      // Ausente/nulo = tabela não cadastrada.
+      feeRates: feeRatesJson == null ? null : FeeRates.fromJson(feeRatesJson),
+      embedFeeInPrice: j.boolean('embed_fee_in_price'),
     );
   }
 
@@ -62,11 +127,21 @@ class PaymentSettings extends Equatable {
   /// Links de pagamento pendentes (só papéis gerenciais).
   final int pendingLinks;
 
+  /// Tabela de taxas por método; `null` = não cadastrada.
+  final FeeRates? feeRates;
+
+  /// Embutir a taxa de pagamento no preço do orçamento.
+  final bool embedFeeInPrice;
+
   /// `••••1234` quando conectada, vazio caso contrário.
   String get maskedApiKey => apiKeyLast4 == null ? '' : '••••$apiKeyLast4';
 
   /// Pode gerar links de pagamento (conectada e ligada).
   bool get isActive => connected && enabled;
+
+  /// Taxa de referência usada ao embutir: crédito em [assuredInstallments].
+  double? get referenceFeeRate =>
+      feeRates?.rateForInstallments(assuredInstallments);
 
   PaymentSettings copyWith({
     String? Function()? handle,
@@ -77,6 +152,8 @@ class PaymentSettings extends Equatable {
     int? pixDiscountPercent,
     double? Function()? defaultDepositPercent,
     int? pendingLinks,
+    FeeRates? Function()? feeRates,
+    bool? embedFeeInPrice,
   }) => PaymentSettings(
     handle: handle == null ? this.handle : handle(),
     enabled: enabled ?? this.enabled,
@@ -88,6 +165,8 @@ class PaymentSettings extends Equatable {
         ? this.defaultDepositPercent
         : defaultDepositPercent(),
     pendingLinks: pendingLinks ?? this.pendingLinks,
+    feeRates: feeRates == null ? this.feeRates : feeRates(),
+    embedFeeInPrice: embedFeeInPrice ?? this.embedFeeInPrice,
   );
 
   @override
@@ -100,6 +179,8 @@ class PaymentSettings extends Equatable {
     pixDiscountPercent,
     defaultDepositPercent,
     pendingLinks,
+    feeRates,
+    embedFeeInPrice,
   ];
 }
 
@@ -116,6 +197,8 @@ class PaymentSettingsUpdate extends Equatable {
     required this.pixDiscountPercent,
     this.apiKey,
     this.defaultDepositPercent,
+    this.feeRates,
+    this.embedFeeInPrice = false,
   });
 
   final String? handle;
@@ -129,6 +212,12 @@ class PaymentSettingsUpdate extends Equatable {
   /// `null` = pagamento integral (enviado explícito para poder limpar).
   final double? defaultDepositPercent;
 
+  /// Tabela de taxas; `null`/vazia envia `fee_rates: null` (limpa a tabela).
+  final FeeRates? feeRates;
+
+  /// Embutir a taxa no preço.
+  final bool embedFeeInPrice;
+
   Json toJson() => {
     if (apiKey != null && apiKey!.trim().isNotEmpty) 'api_key': apiKey!.trim(),
     'handle': handle?.trim(),
@@ -136,6 +225,11 @@ class PaymentSettingsUpdate extends Equatable {
     'assured_installments': assuredInstallments,
     'pix_discount_percent': pixDiscountPercent,
     'default_deposit_percent': defaultDepositPercent,
+    // Explícito (inclusive null) para poder limpar a tabela.
+    'fee_rates': feeRates == null || !feeRates!.hasAny
+        ? null
+        : feeRates!.toJson(),
+    'embed_fee_in_price': embedFeeInPrice,
   };
 
   @override
@@ -146,5 +240,7 @@ class PaymentSettingsUpdate extends Equatable {
     pixDiscountPercent,
     apiKey,
     defaultDepositPercent,
+    feeRates,
+    embedFeeInPrice,
   ];
 }

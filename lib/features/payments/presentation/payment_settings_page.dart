@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/payments/presentation/payment_settings_cubit.dart';
 
 class PaymentSettingsPage extends StatelessWidget {
@@ -187,6 +189,8 @@ class _PaymentSettingsView extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    _FeeRatesCard(state: state),
                     if (state.connected) ...[
                       const SizedBox(height: 16),
                       Align(
@@ -255,6 +259,204 @@ class _PaymentSettingsView extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Tabela de taxas da InfinitePay + interruptor de embutir no preço.
+class _FeeRatesCard extends StatelessWidget {
+  const _FeeRatesCard({required this.state});
+
+  final PaymentSettingsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<PaymentSettingsCubit>();
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final errors = state.errors;
+    // O PUT exige credenciais: enquanto desconectada, só leitura.
+    final enabled = state.connected && !state.saving;
+    const decimalHint = 'use vírgula para decimais (ex.: 4,99)';
+    final invalidInstallments = [
+      for (final n in kFeeInstallments)
+        if (errors.containsKey('fee_credit_$n')) n,
+    ];
+
+    return SectionCard(
+      title: 'Taxas da InfinitePay',
+      subtitle:
+          'O quanto a InfinitePay desconta de cada cobrança. Copie do app '
+          'InfinitePay → Taxas.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!state.connected) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: ext.infoSurface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: ext.infoText,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Conecte a InfinitePay (acima) para cadastrar as taxas.',
+                      style: typo.body13.copyWith(color: ext.infoText),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 180,
+                child: FormaNumberField(
+                  key: const ValueKey('fee-pix'),
+                  label: 'Pix',
+                  value: state.pixRate,
+                  decimals: 2,
+                  suffixText: '%',
+                  enabled: enabled,
+                  errorText: errors['fee_pix'],
+                  helperText: errors['fee_pix'] == null ? decimalHint : null,
+                  onChanged: (v) => cubit.setPixRate(v?.toDouble()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 180,
+                child: FormaNumberField(
+                  key: const ValueKey('fee-credit-1x'),
+                  label: 'Crédito à vista',
+                  value: state.credit1xRate,
+                  decimals: 2,
+                  suffixText: '%',
+                  enabled: enabled,
+                  errorText: errors['fee_credit_1x'],
+                  helperText: errors['fee_credit_1x'] == null
+                      ? decimalHint
+                      : null,
+                  onChanged: (v) => cubit.setCredit1xRate(v?.toDouble()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Crédito parcelado',
+            style: typo.body14Medium.copyWith(color: ext.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final n in kFeeInstallments)
+                SizedBox(
+                  width: 110,
+                  child: Semantics(
+                    label: '${n}x, taxa de crédito, percentual',
+                    child: FormaNumberField(
+                      key: ValueKey('fee-credit-$n'),
+                      label: '${n}x',
+                      value: state.installmentRates[n],
+                      decimals: 2,
+                      suffixText: '%',
+                      enabled: enabled,
+                      // Só a borda vermelha; o detalhe vai no resumo abaixo.
+                      errorText: errors.containsKey('fee_credit_$n')
+                          ? ''
+                          : null,
+                      onChanged: (v) =>
+                          cubit.setInstallmentRate(n, v?.toDouble()),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (invalidInstallments.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                'Taxas inválidas em '
+                '${invalidInstallments.map((n) => '${n}x').join(', ')}: '
+                'informe entre 0 e 30%.',
+                style: typo.caption12.copyWith(color: ext.errorColor),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Divider(color: ext.border, height: 1),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FormaSwitch(
+                value: state.embedFeeInPrice,
+                onChanged: enabled
+                    ? (v) => cubit.setEmbedFeeInPrice(embed: v)
+                    : null,
+                semanticLabel: 'Embutir taxa de pagamento no preço',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Embutir taxa de pagamento no preço',
+                      style: typo.body14Medium.copyWith(color: ext.textPrimary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _referenceText(state),
+                      style: typo.caption12.copyWith(color: ext.textMuted),
+                    ),
+                    if (errors['embed_fee'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            errors['embed_fee']!,
+                            style: typo.caption12.copyWith(
+                              color: ext.errorColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Explica qual taxa de referência o interruptor usa.
+  static String _referenceText(PaymentSettingsState state) {
+    final n = state.assuredInstallments;
+    final where = n <= 1 ? 'crédito à vista' : 'crédito em ${n}x';
+    final rate = state.referenceFeeRate;
+    if (rate == null) {
+      return 'Usa a taxa do $where — cadastre-a acima para ligar.';
+    }
+    return 'Usa a taxa do $where: ${Fmt.percent(rate, decimals: 2)}.';
   }
 }
 
