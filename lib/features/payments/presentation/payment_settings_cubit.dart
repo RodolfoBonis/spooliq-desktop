@@ -15,6 +15,9 @@ const _apiKeyRequiredMessage = 'Informe a chave de API.';
 const _unavailableMessage =
     'Os pagamentos estão indisponíveis no momento. Tente novamente em '
     'instantes.';
+const _feeRateMissingMessage =
+    'Cadastre a taxa do crédito nas parcelas sem juros antes de embutir a '
+    'taxa no preço.';
 
 /// Traduz os erros conhecidos da InfinitePay; demais erros mostram a mensagem
 /// que a própria API enviou.
@@ -24,6 +27,8 @@ String friendlyPaymentError(ApiError error) {
       return _invalidCredentialsMessage;
     case 'api_key_required':
       return _apiKeyRequiredMessage;
+    case 'payment_fee_rate_missing':
+      return _feeRateMissingMessage;
     case 'payments_not_configured':
       return _unavailableMessage;
   }
@@ -40,6 +45,10 @@ class PaymentSettingsState extends Equatable {
     this.assuredInstallments = 12,
     this.pixDiscountPercent = 0,
     this.defaultDepositPercent,
+    this.pixRate,
+    this.credit1xRate,
+    this.installmentRates = const {},
+    this.embedFeeInPrice = false,
     this.newApiKey,
     this.editingKey = false,
     this.submitted = false,
@@ -59,6 +68,16 @@ class PaymentSettingsState extends Equatable {
   final int pixDiscountPercent;
   final double? defaultDepositPercent;
 
+  /// Taxas (%) por método; `null` = não informada.
+  final double? pixRate;
+  final double? credit1xRate;
+
+  /// Taxas (%) por número de parcelas (2–12); valor `null` = não informada.
+  final Map<int, double?> installmentRates;
+
+  /// Embutir a taxa de pagamento no preço do orçamento.
+  final bool embedFeeInPrice;
+
   /// Nova chave digitada; `null` = manter a atual.
   final String? newApiKey;
 
@@ -75,6 +94,22 @@ class PaymentSettingsState extends Equatable {
   int get pendingLinks => original?.pendingLinks ?? 0;
   String get maskedApiKey => original?.maskedApiKey ?? '';
   bool get saving => status == PaymentSettingsStatus.saving;
+
+  /// Taxa de referência para embutir: crédito em [assuredInstallments].
+  /// Crédito à vista quando N≤1, senão a parcela correspondente.
+  double? get referenceFeeRate => assuredInstallments <= 1
+      ? credit1xRate
+      : installmentRates[assuredInstallments];
+
+  /// Monta a tabela de taxas a partir do formulário (ignora parcelas vazias).
+  FeeRates buildFeeRates() => FeeRates(
+    pix: pixRate,
+    credit1x: credit1xRate,
+    creditInstallments: {
+      for (final n in kFeeInstallments)
+        if (installmentRates[n] != null) n: installmentRates[n]!,
+    },
+  );
 
   /// Erros de validação por campo, calculados sob demanda.
   Map<String, String> validate() {
@@ -102,8 +137,27 @@ class PaymentSettingsState extends Equatable {
     if (deposit != null && (deposit <= 0 || deposit >= 100)) {
       errors['deposit'] = 'O sinal deve ser maior que 0 e menor que 100%.';
     }
+    // Taxas: cada valor informado precisa ficar entre 0 e 30%.
+    const feeRangeMessage = 'A taxa deve estar entre 0 e 30%.';
+    if (!_inFeeRange(pixRate)) errors['fee_pix'] = feeRangeMessage;
+    if (!_inFeeRange(credit1xRate)) errors['fee_credit_1x'] = feeRangeMessage;
+    for (final n in kFeeInstallments) {
+      if (!_inFeeRange(installmentRates[n])) {
+        errors['fee_credit_$n'] = feeRangeMessage;
+      }
+    }
+    // Para embutir, a taxa de referência precisa estar cadastrada.
+    if (embedFeeInPrice && referenceFeeRate == null) {
+      errors['embed_fee'] = assuredInstallments <= 1
+          ? 'Cadastre a taxa do crédito à vista para embutir no preço.'
+          : 'Cadastre a taxa do crédito em ${assuredInstallments}x para '
+                'embutir no preço.';
+    }
     return errors;
   }
+
+  static bool _inFeeRange(double? value) =>
+      value == null || (value >= 0 && value <= 30);
 
   /// Erros exibidos na UI (só após a 1ª tentativa de salvar).
   Map<String, String> get errors => submitted ? validate() : const {};
@@ -112,6 +166,13 @@ class PaymentSettingsState extends Equatable {
     final o = original;
     if (o == null) return false;
     if ((newApiKey ?? '').trim().isNotEmpty) return true;
+    if (embedFeeInPrice != o.embedFeeInPrice) return true;
+    final fees = o.feeRates;
+    if (pixRate != fees?.pix) return true;
+    if (credit1xRate != fees?.credit1x) return true;
+    for (final n in kFeeInstallments) {
+      if (installmentRates[n] != fees?.creditInstallments[n]) return true;
+    }
     return handle != (o.handle ?? '') ||
         enabled != o.enabled ||
         assuredInstallments != o.assuredInstallments ||
@@ -127,6 +188,10 @@ class PaymentSettingsState extends Equatable {
     int? assuredInstallments,
     int? pixDiscountPercent,
     double? Function()? defaultDepositPercent,
+    double? Function()? pixRate,
+    double? Function()? credit1xRate,
+    Map<int, double?>? installmentRates,
+    bool? embedFeeInPrice,
     String? Function()? newApiKey,
     bool? editingKey,
     bool? submitted,
@@ -142,6 +207,10 @@ class PaymentSettingsState extends Equatable {
     defaultDepositPercent: defaultDepositPercent == null
         ? this.defaultDepositPercent
         : defaultDepositPercent(),
+    pixRate: pixRate == null ? this.pixRate : pixRate(),
+    credit1xRate: credit1xRate == null ? this.credit1xRate : credit1xRate(),
+    installmentRates: installmentRates ?? this.installmentRates,
+    embedFeeInPrice: embedFeeInPrice ?? this.embedFeeInPrice,
     newApiKey: newApiKey == null ? this.newApiKey : newApiKey(),
     editingKey: editingKey ?? this.editingKey,
     submitted: submitted ?? this.submitted,
@@ -158,6 +227,10 @@ class PaymentSettingsState extends Equatable {
     assuredInstallments,
     pixDiscountPercent,
     defaultDepositPercent,
+    pixRate,
+    credit1xRate,
+    installmentRates,
+    embedFeeInPrice,
     newApiKey,
     editingKey,
     submitted,
@@ -194,17 +267,26 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
     }
   }
 
-  PaymentSettingsState _applyLoaded(PaymentSettings s) => PaymentSettingsState(
-    status: PaymentSettingsStatus.ready,
-    original: s,
-    handle: s.handle ?? '',
-    enabled: s.enabled,
-    assuredInstallments: s.assuredInstallments,
-    pixDiscountPercent: s.pixDiscountPercent,
-    defaultDepositPercent: s.defaultDepositPercent,
-    // Sem credenciais, o campo de chave já abre em edição.
-    editingKey: !s.connected,
-  );
+  PaymentSettingsState _applyLoaded(PaymentSettings s) {
+    final fees = s.feeRates;
+    return PaymentSettingsState(
+      status: PaymentSettingsStatus.ready,
+      original: s,
+      handle: s.handle ?? '',
+      enabled: s.enabled,
+      assuredInstallments: s.assuredInstallments,
+      pixDiscountPercent: s.pixDiscountPercent,
+      defaultDepositPercent: s.defaultDepositPercent,
+      pixRate: fees?.pix,
+      credit1xRate: fees?.credit1x,
+      installmentRates: {
+        for (final n in kFeeInstallments) n: fees?.creditInstallments[n],
+      },
+      embedFeeInPrice: s.embedFeeInPrice,
+      // Sem credenciais, o campo de chave já abre em edição.
+      editingKey: !s.connected,
+    );
+  }
 
   void setHandle(String value) =>
       emit(state.copyWith(handle: value, saveError: () => null));
@@ -223,6 +305,21 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
   void setDefaultDeposit(double? value) => emit(
     state.copyWith(defaultDepositPercent: () => value, saveError: () => null),
   );
+
+  void setPixRate(double? value) =>
+      emit(state.copyWith(pixRate: () => value, saveError: () => null));
+
+  void setCredit1xRate(double? value) =>
+      emit(state.copyWith(credit1xRate: () => value, saveError: () => null));
+
+  void setInstallmentRate(int installments, double? value) {
+    final next = Map<int, double?>.from(state.installmentRates)
+      ..[installments] = value;
+    emit(state.copyWith(installmentRates: next, saveError: () => null));
+  }
+
+  void setEmbedFeeInPrice({required bool embed}) =>
+      emit(state.copyWith(embedFeeInPrice: embed, saveError: () => null));
 
   /// Começa a trocar a chave de API (campo passa a aceitar uma nova).
   void startEditingKey() =>
@@ -260,6 +357,8 @@ class PaymentSettingsCubit extends Cubit<PaymentSettingsState> {
       assuredInstallments: state.assuredInstallments,
       pixDiscountPercent: state.pixDiscountPercent,
       defaultDepositPercent: state.defaultDepositPercent,
+      feeRates: state.buildFeeRates(),
+      embedFeeInPrice: state.embedFeeInPrice,
     );
     try {
       final saved = await _repo.updateSettings(update);

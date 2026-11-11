@@ -196,6 +196,14 @@ class PriceSummary extends StatelessWidget {
             b.taxCents,
             hint: 'inclusos · ${Fmt.percent(b.taxRateApplied)}',
           ),
+        if (b.hasEmbeddedPaymentFee)
+          line(
+            'Taxa de pagamento',
+            b.paymentFeeAmountCents,
+            hint:
+                'inclusa · '
+                '${Fmt.percent(b.paymentFeeRateApplied, decimals: 2)}',
+          ),
         Padding(
           padding: EdgeInsets.symmetric(vertical: dense ? 6 : 10),
           child: Divider(color: ext.border, height: 1),

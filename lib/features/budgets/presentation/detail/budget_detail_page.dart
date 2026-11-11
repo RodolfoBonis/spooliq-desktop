@@ -61,6 +61,7 @@ class BudgetDetailPage extends StatelessWidget {
             history: state.history,
             payments: state.payments,
             refundDueCents: state.refundDueCents,
+            netReceivedCents: state.netReceivedCents,
             paymentsEnabled: state.paymentsEnabled,
           );
         },
@@ -75,6 +76,7 @@ class _DetailView extends StatelessWidget {
     required this.history,
     required this.payments,
     required this.refundDueCents,
+    required this.netReceivedCents,
     required this.paymentsEnabled,
   });
 
@@ -82,6 +84,7 @@ class _DetailView extends StatelessWidget {
   final List<StatusChange> history;
   final List<BudgetPayment> payments;
   final int refundDueCents;
+  final int? netReceivedCents;
   final bool paymentsEnabled;
 
   @override
@@ -186,6 +189,7 @@ class _DetailView extends StatelessWidget {
             history: history,
             payments: payments,
             refundDueCents: refundDueCents,
+            netReceivedCents: netReceivedCents,
           );
           if (!wide) {
             return Column(
@@ -517,12 +521,14 @@ class _SideColumn extends StatelessWidget {
     required this.history,
     required this.payments,
     required this.refundDueCents,
+    required this.netReceivedCents,
   });
 
   final Budget budget;
   final List<StatusChange> history;
   final List<BudgetPayment> payments;
   final int refundDueCents;
+  final int? netReceivedCents;
 
   bool get _showPayment =>
       budget.paymentStatus != PaymentStatus.unpaid ||
@@ -548,6 +554,7 @@ class _SideColumn extends StatelessWidget {
             budget: budget,
             payments: payments,
             refundDueCents: refundDueCents,
+            netReceivedCents: netReceivedCents,
           ),
         ],
         const SizedBox(height: 16),
@@ -617,11 +624,19 @@ class _PaymentCard extends StatelessWidget {
     required this.budget,
     required this.payments,
     required this.refundDueCents,
+    required this.netReceivedCents,
   });
 
   final Budget budget;
   final List<BudgetPayment> payments;
   final int refundDueCents;
+  final int? netReceivedCents;
+
+  /// Há cobrança paga mas sem estimativa de taxa/líquido (tabela não
+  /// cadastrada) — vale oferecer o cadastro das taxas.
+  bool get _showFeeCta =>
+      netReceivedCents == null &&
+      payments.any((p) => p.isPaid && !p.isPaidAfterCancel);
 
   @override
   Widget build(BuildContext context) {
@@ -653,6 +668,31 @@ class _PaymentCard extends StatelessWidget {
               ),
             ],
           ),
+          if (netReceivedCents != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Líquido recebido ≈ ${Fmt.cents(netReceivedCents)}',
+              style: typo.body13.copyWith(color: ext.textMuted),
+            ),
+          ],
+          if (_showFeeCta) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => unawaited(context.push(Routes.payments)),
+                icon: const Icon(Icons.percent_rounded, size: 15),
+                label: const Text(
+                  'Cadastre suas taxas para ver quanto recebe',
+                ),
+              ),
+            ),
+          ],
           if (overpaid) ...[
             const SizedBox(height: 10),
             _Note(
@@ -832,6 +872,14 @@ class _PaymentRow extends StatelessWidget {
               ),
           ],
         ),
+        if (p.isPaid && p.hasFeeEstimate)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              _feeLine(p),
+              style: typo.caption12.copyWith(color: ext.textMuted),
+            ),
+          ),
         if (p.isPaidAfterCancel)
           Padding(
             padding: const EdgeInsets.only(top: 2),
@@ -856,6 +904,17 @@ class _PaymentRow extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  /// "Você recebe ≈ R$ X · taxa ≈ R$ Y (Z%)".
+  static String _feeLine(BudgetPayment p) {
+    final buffer = StringBuffer(
+      'Você recebe ≈ ${Fmt.cents(p.netAmountCents)} · '
+      'taxa ≈ ${Fmt.cents(p.feeAmountCents)}',
+    );
+    final rate = p.feeRatePercent;
+    if (rate != null) buffer.write(' (${Fmt.percent(rate, decimals: 2)})');
+    return buffer.toString();
   }
 
   static String _statusLabel(BudgetPaymentStatus s) => switch (s) {

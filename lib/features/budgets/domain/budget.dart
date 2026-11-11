@@ -563,6 +563,8 @@ class Budget extends Equatable {
     this.notes,
     this.pdfUrl,
     this.depositPercent,
+    this.paymentFeeRateApplied = 0,
+    this.paymentFeeAmountCents = 0,
     this.paymentStatus = PaymentStatus.unpaid,
     this.amountPaidCents = 0,
     this.balanceDueCents = 0,
@@ -615,6 +617,9 @@ class Budget extends Equatable {
     notes: json.strOrNull('notes'),
     pdfUrl: json.strOrNull('pdf_url'),
     depositPercent: json.dblOrNull('deposit_percent'),
+    // Taxa de pagamento embutida no preço; 0 quando não embute.
+    paymentFeeRateApplied: json.dbl('payment_fee_rate_applied'),
+    paymentFeeAmountCents: json.integer('payment_fee_amount'),
     paymentStatus: PaymentStatus.fromValue(json.strOrNull('payment_status')),
     amountPaidCents: json.integer('amount_paid'),
     balanceDueCents: _balanceDueFrom(json),
@@ -674,6 +679,12 @@ class Budget extends Equatable {
   /// Sinal (%) definido para este orçamento; `null` = pagamento integral.
   final double? depositPercent;
 
+  /// Taxa de pagamento (%) embutida no preço; 0 quando não embute.
+  final double paymentFeeRateApplied;
+
+  /// Valor da taxa de pagamento embutida no preço (centavos).
+  final int paymentFeeAmountCents;
+
   /// Situação de pagamento agregada.
   final PaymentStatus paymentStatus;
 
@@ -699,6 +710,9 @@ class Budget extends Equatable {
   String get customerName => customer?.name ?? '';
 
   bool get isShared => publicToken != null;
+
+  /// A taxa de pagamento está embutida neste orçamento.
+  bool get hasEmbeddedPaymentFee => paymentFeeAmountCents > 0;
 
   /// Algum item usa o cálculo antigo: vale recalcular (ou duplicar e
   /// recalcular, se já não for rascunho).
@@ -758,6 +772,8 @@ class Budget extends Equatable {
       notes: b.notes,
       pdfUrl: b.pdfUrl,
       depositPercent: b.depositPercent,
+      paymentFeeRateApplied: b.paymentFeeRateApplied,
+      paymentFeeAmountCents: b.paymentFeeAmountCents,
       paymentStatus: b.paymentStatus,
       amountPaidCents: b.amountPaidCents,
       balanceDueCents: b.balanceDueCents,
@@ -785,6 +801,7 @@ class Budget extends Equatable {
     amountPaidCents,
     balanceDueCents,
     amountRefundDueCents,
+    paymentFeeAmountCents,
   ];
 }
 

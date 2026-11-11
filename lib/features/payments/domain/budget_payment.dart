@@ -81,6 +81,9 @@ class BudgetPayment extends Equatable {
     this.statusReason,
     this.receiptUrl,
     this.paidAt,
+    this.feeAmountCents,
+    this.netAmountCents,
+    this.feeRatePercent,
   });
 
   factory BudgetPayment.fromJson(Json json) => BudgetPayment(
@@ -94,6 +97,10 @@ class BudgetPayment extends Equatable {
     statusReason: json.strOrNull('status_reason'),
     receiptUrl: json.strOrNull('receipt_url'),
     paidAt: json.date('paid_at'),
+    // Taxa da InfinitePay: ausente/nulo = desconhecida (sem tabela).
+    feeAmountCents: json.intOrNull('fee_amount'),
+    netAmountCents: json.intOrNull('net_amount'),
+    feeRatePercent: json.dblOrNull('fee_rate_percent'),
   );
 
   final PaymentKind kind;
@@ -108,7 +115,19 @@ class BudgetPayment extends Equatable {
   final String? receiptUrl;
   final DateTime? paidAt;
 
+  /// Taxa cobrada pela InfinitePay (centavos); `null` = desconhecida.
+  final int? feeAmountCents;
+
+  /// Valor líquido recebido (centavos); `null` = desconhecido.
+  final int? netAmountCents;
+
+  /// Percentual da taxa aplicada; `null` = desconhecido.
+  final double? feeRatePercent;
+
   bool get isPaid => status == BudgetPaymentStatus.paid;
+
+  /// Há estimativa de taxa/líquido para esta linha.
+  bool get hasFeeEstimate => netAmountCents != null && feeAmountCents != null;
 
   /// O comprador pagou depois do link ter sido cancelado (precisa de estorno
   /// manual pela InfinitePay).
@@ -132,31 +151,54 @@ class BudgetPayment extends Equatable {
     statusReason,
     receiptUrl,
     paidAt,
+    feeAmountCents,
+    netAmountCents,
+    feeRatePercent,
   ];
 }
 
 /// Resposta de `GET /v1/budgets/:id/payments` (`BudgetPaymentsResponse`).
 ///
 /// Só guardamos o que a tela usa: o valor a reembolsar (soma dos pagamentos
-/// `paid_after_cancel`, que NÃO entra no total pago) e as linhas. A agregação
-/// pago/saldo vem do próprio orçamento.
+/// `paid_after_cancel`, que NÃO entra no total pago), as linhas e os totais de
+/// taxa/líquido. A agregação pago/saldo vem do próprio orçamento.
 class BudgetPaymentsResult extends Equatable {
   const BudgetPaymentsResult({
     this.refundDueCents = 0,
     this.payments = const [],
+    this.feesCents,
+    this.netReceivedCents,
   });
 
   factory BudgetPaymentsResult.fromJson(Json json) => BudgetPaymentsResult(
     refundDueCents: json.integer('refund_due'),
     payments: json.list('payments', BudgetPayment.fromJson),
+    // Soma das taxas/líquido conhecidos; ausente = desconhecido.
+    feesCents: json.intOrNull('fees'),
+    netReceivedCents: json.intOrNull('net_received'),
   );
 
   /// Valor recebido em links cancelados, a reembolsar pela InfinitePay.
   final int refundDueCents;
   final List<BudgetPayment> payments;
 
+  /// Soma das taxas conhecidas das linhas pagas e contadas; `null` = sem
+  /// estimativa (tabela não cadastrada).
+  final int? feesCents;
+
+  /// Líquido total recebido; `null` = desconhecido.
+  final int? netReceivedCents;
+
+  /// Há estimativa de líquido total para exibir.
+  bool get hasNetReceived => netReceivedCents != null;
+
   @override
-  List<Object?> get props => [refundDueCents, payments];
+  List<Object?> get props => [
+    refundDueCents,
+    payments,
+    feesCents,
+    netReceivedCents,
+  ];
 }
 
 /// Link de pagamento gerado (`CreateLinkResponse`).

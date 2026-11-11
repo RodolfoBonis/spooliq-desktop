@@ -398,8 +398,9 @@ class _Kpis extends StatelessWidget {
             : '${Fmt.cents(o.profitRealizedCents)} realizado · '
                   '${Fmt.cents(o.profitForecastCents)} previsto',
         tooltip:
-            'Margem dos orçamentos aprovados menos descontos. Realizado = '
-            'concluídos; previsto = aprovados e em impressão.',
+            'Margem dos orçamentos aprovados, menos descontos e já '
+            'descontadas as taxas de pagamento da InfinitePay. '
+            'Realizado = concluídos; previsto = aprovados e em impressão.',
       ),
       _Kpi(
         label: 'Margem',

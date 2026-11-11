@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:forma_ui/forma_ui.dart';
 import 'package:spooliq_desktop/core/di/injector.dart';
+import 'package:spooliq_desktop/core/format/formatters.dart';
 import 'package:spooliq_desktop/core/ui/feedback.dart';
 import 'package:spooliq_desktop/core/ui/page_layout.dart';
 import 'package:spooliq_desktop/features/payments/domain/payment_repository.dart';
+import 'package:spooliq_desktop/features/payments/domain/payment_settings.dart';
 import 'package:spooliq_desktop/features/payments/presentation/payment_settings_cubit.dart';
 
 class PaymentSettingsPage extends StatelessWidget {
@@ -187,6 +189,8 @@ class _PaymentSettingsView extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    _FeeRatesCard(state: state),
                     if (state.connected) ...[
                       const SizedBox(height: 16),
                       Align(
@@ -255,6 +259,150 @@ class _PaymentSettingsView extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Tabela de taxas da InfinitePay + interruptor de embutir no preço.
+class _FeeRatesCard extends StatelessWidget {
+  const _FeeRatesCard({required this.state});
+
+  final PaymentSettingsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<PaymentSettingsCubit>();
+    final ext = Theme.of(context).extension<FormaThemeExtension>()!;
+    final typo = context.formaTypography;
+    final saving = state.saving;
+    final errors = state.errors;
+
+    return SectionCard(
+      title: 'Taxas da InfinitePay',
+      subtitle:
+          'O quanto a InfinitePay desconta de cada cobrança. Copie do app '
+          'InfinitePay → Taxas.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 160,
+                child: FormaNumberField(
+                  key: const ValueKey('fee-pix'),
+                  label: 'Pix',
+                  value: state.pixRate,
+                  decimals: 2,
+                  suffixText: '%',
+                  min: 0,
+                  max: 30,
+                  enabled: !saving,
+                  errorText: errors['fee_pix'],
+                  onChanged: (v) => cubit.setPixRate(v?.toDouble()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 160,
+                child: FormaNumberField(
+                  key: const ValueKey('fee-credit-1x'),
+                  label: 'Crédito à vista',
+                  value: state.credit1xRate,
+                  decimals: 2,
+                  suffixText: '%',
+                  min: 0,
+                  max: 30,
+                  enabled: !saving,
+                  errorText: errors['fee_credit_1x'],
+                  onChanged: (v) => cubit.setCredit1xRate(v?.toDouble()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Crédito parcelado',
+            style: typo.body14Medium.copyWith(color: ext.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final n in kFeeInstallments)
+                SizedBox(
+                  width: 110,
+                  child: FormaNumberField(
+                    key: ValueKey('fee-credit-$n'),
+                    label: '${n}x',
+                    value: state.installmentRates[n],
+                    decimals: 2,
+                    suffixText: '%',
+                    min: 0,
+                    max: 30,
+                    enabled: !saving,
+                    errorText: errors['fee_credit_$n'] == null ? null : '',
+                    onChanged: (v) =>
+                        cubit.setInstallmentRate(n, v?.toDouble()),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Divider(color: ext.border, height: 1),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FormaSwitch(
+                value: state.embedFeeInPrice,
+                onChanged: saving
+                    ? null
+                    : (v) => cubit.setEmbedFeeInPrice(embed: v),
+                semanticLabel: 'Embutir taxa de pagamento no preço',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Embutir taxa de pagamento no preço',
+                      style: typo.body14Medium.copyWith(color: ext.textPrimary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _referenceText(state),
+                      style: typo.caption12.copyWith(color: ext.textMuted),
+                    ),
+                    if (errors['embed_fee'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          errors['embed_fee']!,
+                          style: typo.caption12.copyWith(color: ext.errorColor),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Explica qual taxa de referência o interruptor usa.
+  static String _referenceText(PaymentSettingsState state) {
+    final n = state.assuredInstallments;
+    final where = n <= 1 ? 'crédito à vista' : 'crédito em ${n}x';
+    final rate = state.referenceFeeRate;
+    if (rate == null) {
+      return 'Usa a taxa do $where — cadastre-a acima para ligar.';
+    }
+    return 'Usa a taxa do $where: ${Fmt.percent(rate, decimals: 2)}.';
   }
 }
 
