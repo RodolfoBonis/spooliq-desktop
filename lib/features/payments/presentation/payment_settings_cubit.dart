@@ -18,6 +18,8 @@ const _unavailableMessage =
 const _feeRateMissingMessage =
     'Cadastre a taxa do crédito nas parcelas sem juros antes de embutir a '
     'taxa no preço.';
+const _feeRateInvalidMessage =
+    'Confira as taxas: use valores de 0 a 30% com até 2 casas decimais.';
 
 /// Mensagens de validação das taxas.
 const feeRangeMessage = 'A taxa deve estar entre 0 e 30%.';
@@ -33,6 +35,8 @@ String friendlyPaymentError(ApiError error) {
       return _apiKeyRequiredMessage;
     case 'payment_fee_rate_missing':
       return _feeRateMissingMessage;
+    case 'payment_fee_rate_invalid':
+      return _feeRateInvalidMessage;
     case 'payments_not_configured':
       return _unavailableMessage;
   }

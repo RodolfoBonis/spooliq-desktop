@@ -46,6 +46,19 @@ void main() {
     );
   });
 
+  test('friendlyPaymentError maps payment_fee_rate_invalid', () {
+    expect(
+      friendlyPaymentError(
+        const BusinessError(
+          'invalid',
+          code: 'payment_fee_rate_invalid',
+          statusCode: 422,
+        ),
+      ),
+      contains('0 a 30%'),
+    );
+  });
+
   blocTest<PaymentSettingsCubit, PaymentSettingsState>(
     'seeds the fee form from the loaded table',
     setUp: () => when(() => repo.getSettings()).thenAnswer(
